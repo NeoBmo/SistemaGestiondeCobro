@@ -1,0 +1,24 @@
+# Entorno y secretos — nunca se commitean
+.env
+.env.*
+!.env.example
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+
+# Editores
+.vscode/
+.idea/
+*.swp
+
+# Node / Next.js — se activan de lleno al ejecutar F0 (create-next-app
+# genera su propio .gitignore más completo; este cubre el vacío hasta
+# entonces, para que el commit de planificación no arrastre basura)
+node_modules/
+.next/
+out/
+npm-debug.log*
+
+# Logs
+*.log
