@@ -30,8 +30,10 @@ Plataforma web multi-negocio para negocios que prestan dinero y cobran cuotas me
 | Typecheck | `npm run typecheck` |
 | Lint | `npm run lint` |
 | Test unitario | `npm test` |
+| Test integración (requiere BD local) | `npm run test:integration` |
 | Test e2e | `npm run test:e2e` |
 | Build | `npm run build` |
+| BD local (Docker): iniciar / detener / aplicar migraciones nuevas | `npm run db:start` / `db:stop` / `db:migrate` (solo local; no existe script para `db reset`) |
 | Migración BD | `supabase db push` (pide confirmación: puede apuntar a un proyecto remoto) |
 
 ## Documentos fuente (leer antes de implementar)
