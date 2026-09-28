@@ -35,6 +35,17 @@
 
 Los valores de estado se guardan como en `02-DOMINIO.md` (`CONFIRMADO`, `PARCIAL`, `SALDO_APERTURA`…), en mayúsculas y en español: son vocabulario de negocio visible al usuario y estable en datos. Solo los **nombres de tipos, tablas y columnas** van en inglés.
 
+## Campos de identidad y suscripción
+
+| Concepto | Columna / valores |
+| --- | --- |
+| Estado de acceso del negocio | `businesses.access_status` (`ACTIVO`, `SUSPENDIDO`) |
+| Zona horaria del negocio | `businesses.time_zone` (IANA, default `America/Bogota`) |
+| Estado almacenado de la suscripción | `subscriptions.status` (`ACTIVA`, `SUSPENDIDA`, `ARCHIVADA`) |
+| Inicio / vencimiento | `subscriptions.starts_on` / `subscriptions.expires_on` (fecha calendario) |
+| Rol | `profiles.role` (`SUPER_ADMIN`, `ADMIN_NEGOCIO`, `COBRADOR`) |
+| Nombre de usuario (único global) | `profiles.username` |
+
 ## Campos transversales
 
 | Concepto | Columna |

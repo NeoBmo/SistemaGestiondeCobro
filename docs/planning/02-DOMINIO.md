@@ -46,21 +46,23 @@ Valores V1: `SEMANAL`, `MENSUAL`, `ANUAL`.
 
 ### 1.2 Negocio
 
-Datos: id único, nombre, responsable (nombre e identificación), teléfono, fecha de creación, estado de acceso (`ACTIVO` | `SUSPENDIDO`).
-Reglas: ninguna consulta/acción cruza negocios; suspender bloquea acceso sin borrar datos; solo Super Admin activa/suspende.
+Datos: id único, nombre, responsable (nombre e identificación), teléfono, zona horaria (IANA, por defecto `America/Bogota`, fijada al crear el negocio), fecha de creación, estado de acceso (`ACTIVO` | `SUSPENDIDO`).
+Reglas: ninguna consulta/acción cruza negocios; suspender bloquea acceso sin borrar datos; solo Super Admin activa/suspende. **El estado de acceso del Negocio es la única compuerta de acceso**: un negocio `SUSPENDIDO` no admite sesiones de sus usuarios; los estados informativos de la suscripción nunca bloquean.
 Eventos: `NegocioCreado`, `NegocioActualizado`, `NegocioSuspendido`, `NegocioActivado`.
 
 ### 1.3 Suscripción
 
-Datos: negocio, plan, fecha inicio, fecha vencimiento, estado, observación, actor de cambio.
-Estados: `ACTIVA` → `PROXIMA_A_VENCER` (5 días antes de la fecha de vencimiento) → `VENCIDA` → `SUSPENDIDA` (manual) | `ARCHIVADA` (manual, terminal).
+Datos: negocio, plan, fecha inicio, fecha vencimiento, estado, observación, actor de cambio. Cada negocio tiene una suscripción vigente; sus cambios (plan, estado) actualizan esa fila y cada uno se audita con el valor anterior y el nuevo.
+Estados **almacenados**: `ACTIVA` | `SUSPENDIDA` (manual, reversible) | `ARCHIVADA` (manual, terminal). Estados **derivados** por fecha al leer, nunca almacenados: `PROXIMA_A_VENCER` (una suscripción `ACTIVA` a 5 días o menos de su vencimiento) y `VENCIDA` (una `ACTIVA` con vencimiento pasado, según la fecha de hoy en la zona horaria del negocio).
+Vencimiento: `SEMANAL` = inicio + 7 días; `MENSUAL` = mismo día del mes siguiente; `ANUAL` = mismo día del año siguiente; si ese día no existe se usa el último del mes (31 ene → 28/29 feb).
+Sincronía con el Negocio (una sola transacción por comando): suspender → suscripción `SUSPENDIDA` y negocio `SUSPENDIDO`; activar → `ACTIVA` y `ACTIVO`; archivar (solo desde `ACTIVA` o `SUSPENDIDA`, con motivo) → `ARCHIVADA` y negocio `SUSPENDIDO`. Una suscripción `ARCHIVADA` no se reactiva. Cambiar de plan reinicia inicio y vencimiento desde hoy.
 Reglas: `PROXIMA_A_VENCER`/`VENCIDA` son informativos, no bloquean automáticamente. Solo Super Admin cambia entre `ACTIVA`/`SUSPENDIDA`. `ARCHIVADA` es un estado terminal distinto de `SUSPENDIDA`: se usa cuando un negocio se da de baja definitivamente (no se espera que vuelva a `ACTIVA`), mientras que `SUSPENDIDA` sigue siendo reversible. Solo Super Admin archiva, con motivo. Todo cambio se audita.
-Eventos: `SuscripcionCreada`, `PlanCambiado`, `SuscripcionVencida`, `NegocioSuspendido`, `NegocioReactivado`, `NegocioArchivado`.
+Eventos: `SuscripcionCreada`, `PlanCambiado`, `NegocioSuspendido`, `NegocioActivado`, `NegocioArchivado`. (`SuscripcionVencida` deja de ser un evento persistido: es un estado derivado.)
 
 ### 1.4 Usuario
 
 Datos: id, nombre visible, usuario, contraseña segura, rol, negocio opcional, estado, fechas de acceso.
-Acceso: el «usuario» es el identificador de inicio de sesión; internamente se mapea a un email sintético para Supabase Auth (no se envían correos). **Un usuario pertenece a un único negocio**: una misma persona en dos negocios tiene dos cuentas independientes.
+Acceso: el «usuario» es el identificador de inicio de sesión; internamente se mapea a un email sintético para Supabase Auth (no se envían correos). **Un usuario pertenece a un único negocio**: una misma persona en dos negocios tiene dos cuentas independientes. El nombre de usuario es **único en toda la plataforma** (el login pide solo usuario y contraseña); crear un usuario con un nombre existente en cualquier negocio se rechaza.
 Recuperación de contraseña: el admin del negocio restablece la de sus cobradores; el Super Admin restablece la del admin. Todo restablecimiento deja el usuario en `PENDIENTE_CAMBIO_CONTRASENA` y se audita.
 Roles: `SUPER_ADMIN` (sin negocio), `ADMIN_NEGOCIO` (una sola cuenta principal por negocio en V1), `COBRADOR` (pertenece a un negocio, vinculado a un cobrador).
 Estados: `ACTIVO`, `BLOQUEADO`, `PENDIENTE_CAMBIO_CONTRASENA`.
