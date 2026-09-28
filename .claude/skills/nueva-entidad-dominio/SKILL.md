@@ -21,7 +21,7 @@ Argumento: nombre de la entidad como aparece en `docs/planning/02-DOMINIO.md` (p
 
 ## 3. Migración (commit propio, subagente `escritor-de-migraciones`)
 
-`supabase migration new <nombre>`; nunca edites una migración ya aplicada. Toda tabla operativa: `business_id` NOT NULL con FK, entidades hijas con el mismo `business_id` que su padre, importes `bigint`, `interest_bps` entero, fechas `timestamptz` UTC, restricciones de los invariantes de `02` §9 como `CHECK`/`UNIQUE`/índices parciales, RLS por negocio y rol, índices por `business_id`, estado y fecha. Aplica en local con `npm run db:migrate`.
+`supabase migration new <nombre>`; nunca edites una migración ya aplicada. Toda tabla operativa: `business_id` NOT NULL con FK, entidades hijas con el mismo `business_id` que su padre, importes `bigint`, `interest_bps` entero, fechas `timestamptz` UTC, restricciones de los invariantes de `02` §9 como `CHECK`/`UNIQUE`/índices parciales, RLS por negocio y rol (políticas que exigen también negocio `ACTIVO`, con los helpers envueltos en `(select …)`), índices por `business_id`, estado y fecha. Las tablas nuevas nacen **sin privilegios** para los roles de la API: concede explícitamente `select` a `authenticated` (nunca escritura) y no dejes `EXECUTE` a `PUBLIC` en funciones nuevas. Aplica en local con `npm run db:migrate`.
 
 ## 4. Módulo `src/modules/<módulo>/`
 
@@ -30,7 +30,7 @@ Archivos: `types.ts` (tipos de dominio; importes con `Money` de `@/shared/money/
 ## 5. Pruebas (según riesgo; subagente `escritor-de-pruebas`)
 
 - Unitarias por cada regla de `02` (cita la sección en el nombre del caso).
-- Integración en `src/tests/integration/` con `helpers/db.ts` (`createTestPool`, `withRollback`, `attempt`): restricciones de BD, aislamiento entre negocios y, si es hecho financiero, que `UPDATE`/`DELETE` se rechazan.
+- Integración en `src/tests/integration/` con `helpers/db.ts` (`createTestPool`, `withRollback`, `attempt`): restricciones de BD, aislamiento entre negocios y, si es hecho financiero, que `UPDATE`/`DELETE` se rechazan. Los guardianes de `identity-hardening.test.ts` (RLS activo en toda tabla de `public`, sin escritura para la API) deben seguir en verde.
 
 ## 6. Cierre
 

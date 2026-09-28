@@ -25,6 +25,10 @@ La mayoría de las decisiones de V1 ya están cerradas y viven en `02-DOMINIO.md
 | Visibilidad del cobrador sobre historial (pagos/intentos) de clientes que le fueron reasignados a otro | F5 |
 | Metas no funcionales: volumen esperado por negocio, dispositivos/navegadores objetivo, presupuesto por entorno (requiere cifras del dueño del producto) | F8 |
 | Riesgos aceptados a revisar antes de operar con datos reales: retención de 7 días sin recuperación punto-en-el-tiempo, ausencia de 2FA en Super Admin/Admin, operación sin conexión de cobradores | F8 |
+| Política de contraseñas: longitud mínima y requisitos (02 §1.4 solo dice «contraseña segura»; hoy Supabase local usa 6 caracteres sin requisitos) | F1 (antes de T1.2) |
+| Valores de `audit_events.result` (hoy `OK`/`RECHAZADO`; 02 §6.3 solo dice «resultado») y qué ve cada rol (hoy: el Admin lee la suscripción y la auditoría de su negocio; el Cobrador no lee negocio, suscripción ni auditoría) | F1 |
+| Re-suscripción tras `ARCHIVADA`: hoy `unique(business_id)` permite una sola suscripción por negocio y `ARCHIVADA` es terminal; confirmar que «archivada = baja definitiva» | F1 |
+| ¿Puede cambiar el rol, el negocio o el nombre de usuario de un perfil? (hoy inmutables por trigger; un cambio de rol exigiría refrescar el JWT) | F5 |
 
 ## Explícitamente NO pendiente (ya decidido, no volver a abrir)
 
