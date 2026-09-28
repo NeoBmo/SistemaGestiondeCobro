@@ -13,7 +13,6 @@ La mayoría de las decisiones de V1 ya están cerradas y viven en `02-DOMINIO.md
 
 | Tema | Bloquea |
 | --- | --- |
-| Solapamiento de estados entre `Negocio.estado_acceso` y `Suscripción.estado` (¿una sola máquina de estados o dos con reglas de sincronía?) | F1 |
 | Verificar que Supabase Auth (alojado) acepta el dominio del email sintético (ADR 0002): puede validar dominios/MX | F1 |
 | Estado del `movimiento_caja`: ¿hay estados o todo movimiento registrado es definitivo? (02 §5.3 habla de «movimientos confirmados») | F2 |
 | Política de protección de datos personales y conservación (cédulas, teléfonos, direcciones) | Antes de F3 |
@@ -30,6 +29,8 @@ La mayoría de las decisiones de V1 ya están cerradas y viven en `02-DOMINIO.md
 ## Explícitamente NO pendiente (ya decidido, no volver a abrir)
 
 Reglas de negocio: relación contrato→préstamo (1:1), aplicación cronológica de pagos, cálculo de mora derivado, flujo de refinanciación, categorías de gasto, motivos de intento fallido, matriz de permisos por rol, estados de suscripción (incluido `ARCHIVADA` vs `SUSPENDIDA`), prioridad de tickets (sin SLA), fórmula de proyección de cobros futuros.
+
+Estados de Negocio y Suscripción (dos campos sincronizados, `PROXIMA_A_VENCER`/`VENCIDA` derivados, vencimiento por calendario con ajuste de fin de mes, ver 02 §1.2–1.3), unicidad global del nombre de usuario (02 §1.4), zona horaria por negocio (02 §1.2; ADR 0003).
 
 Decisiones técnicas: stack (`03-ARQUITECTURA.md`), retención de backups (7 días), moneda (COP sin decimales), formato de identificadores (UUID interno + código legible de contrato asignado al confirmar), seguridad de Super Admin (mismo flujo Supabase Auth que los demás roles, sin 2FA en V1), umbral de `PROXIMA_A_VENCER` (5 días antes del vencimiento), transacciones con `pg` directo (ADR 0001), 1 usuario = 1 negocio con email sintético (ADR 0002), interés en puntos básicos con redondeo half-up, jornada bloqueante sin cobros ni gastos fuera de una jornada `ABIERTA` (02 §5.2, invariante 13).
 
