@@ -14,6 +14,7 @@ La mayoría de las decisiones de V1 ya están cerradas y viven en `02-DOMINIO.md
 | Tema | Bloquea |
 | --- | --- |
 | Solapamiento de estados entre `Negocio.estado_acceso` y `Suscripción.estado` (¿una sola máquina de estados o dos con reglas de sincronía?) | F1 |
+| Verificar que Supabase Auth (alojado) acepta el dominio del email sintético (ADR 0002): puede validar dominios/MX | F1 |
 | Estado del `movimiento_caja`: ¿hay estados o todo movimiento registrado es definitivo? (02 §5.3 habla de «movimientos confirmados») | F2 |
 | Política de protección de datos personales y conservación (cédulas, teléfonos, direcciones) | Antes de F3 |
 | Reverso de pago cuando existen pagos posteriores: ¿se reaplican en orden o se bloquea el reverso? | F4 |
