@@ -18,7 +18,6 @@
       "Bash(git branch:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(supabase db push:*)",
       "Bash(supabase migration new:*)",
       "Bash(supabase migration list:*)"
     ],
@@ -28,10 +27,12 @@
       "Bash(npm install:*)",
       "Bash(npm uninstall:*)",
       "Bash(npm update:*)",
+      "Bash(supabase db push:*)",
       "Bash(supabase db reset:*)",
       "Bash(rm:*)",
       "Bash(rm -rf:*)",
-      "Bash(mv:*)"
+      "Bash(mv:*)",
+      "Edit(supabase/migrations/**)"
     ],
     "deny": [
       "Read(**/.env)",
@@ -40,6 +41,8 @@
       "Read(**/.env.production)",
       "Read(**/.env.development)",
       "Read(**/.env.staging)",
+      "Read(**/.env.test)",
+      "Read(**/.env.preview)",
       "Read(**/secrets/**)",
       "Read(**/*.pem)",
       "Read(**/*.key)",
@@ -48,8 +51,26 @@
       "Read(**/id_ed25519)",
       "Bash(cat **/.env*)",
       "Bash(cat **/secrets/**)",
+      "Bash(Get-Content **/.env*)",
+      "Bash(type **/.env*)",
       "Bash(git push --force:*)",
-      "Bash(git push -f:*)"
+      "Bash(git push -f:*)",
+      "Bash(git reset --hard:*)",
+      "Bash(git clean:*)",
+      "Bash(git branch -D:*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/block-commit-on-main.sh"
+          }
+        ]
+      }
     ]
   }
 }

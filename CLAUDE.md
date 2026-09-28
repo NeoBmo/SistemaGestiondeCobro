@@ -6,6 +6,8 @@ Plataforma web multi-negocio para negocios que prestan dinero y cobran cuotas me
 
 ## Stack (pinnear exacto en package.json al iniciar F0)
 
+> Las versiones de la tabla son objetivo, no verdad: en F0-T1 resolverlas con `npm view` y verificar compatibilidad (p. ej. next/react) antes de fijarlas exactas. Si difieren, actualizar esta tabla.
+
 | Capa | Paquete | Versión |
 | --- | --- | --- |
 | Runtime | Node.js | 24 LTS |
@@ -14,6 +16,7 @@ Plataforma web multi-negocio para negocios que prestan dinero y cobran cuotas me
 | Lenguaje | typescript | 5.7.x |
 | Estilos | tailwindcss | 4.1.x |
 | BD / Auth | @supabase/ssr, @supabase/supabase-js | ^2.x |
+| Transacciones | pg, @types/pg | ^8.x |
 | Validación | zod | ^3.23 |
 | Test unitario | vitest | ^2.x |
 | Test e2e | @playwright/test | ^1.48 |
@@ -29,11 +32,11 @@ Plataforma web multi-negocio para negocios que prestan dinero y cobran cuotas me
 | Test unitario | `npm test` |
 | Test e2e | `npm run test:e2e` |
 | Build | `npm run build` |
-| Migración BD | `supabase db push` |
+| Migración BD | `supabase db push` (pide confirmación: puede apuntar a un proyecto remoto) |
 
 ## Documentos fuente (leer antes de implementar)
 
-`docs/planning/01` a `07`. Ante conflicto entre ellos: `02-DOMINIO.md` gana en negocio, `03-ARQUITECTURA.md` en técnico. Cualquier archivo fuera de `docs/planning/0X` es historial obsoleto, no referencia.
+`docs/planning/01` a `08` (`08-GLOSARIO.md`: término de dominio → identificador en código; decisiones técnicas en `docs/adr/`). Ante conflicto entre ellos: `02-DOMINIO.md` gana en negocio, `03-ARQUITECTURA.md` en técnico. Cualquier archivo fuera de `docs/planning/0X` es historial obsoleto, no referencia.
 
 ## Allowlist de operaciones
 
@@ -45,7 +48,7 @@ La tabla fija la intención; `.claude/settings.json` (commitéalo) la aplica de 
 | Editar/crear en `src/`, `docs/`, pruebas | Modificar una migración ya aplicada |
 | Crear migraciones nuevas | `supabase db reset` o cualquier comando destructivo de BD |
 | `npm run lint / typecheck / test / build` | Instalar dependencias no listadas arriba |
-| `git add` + `git commit` local (commitea seguido, esto no toca el remoto) | `git push` (siempre; `--force` va bloqueado sin excepción) o merge a `main` |
+| `git add` + `git commit` local en una rama de tarea, nunca en `main` (commitea seguido, esto no toca el remoto) | `git push` (siempre; `--force` va bloqueado sin excepción) o merge a `main` |
 | Leer `.env.example` | Leer o escribir `.env.local` / cualquier secreto — bloqueado, no solo "a confirmar" |
 
 ## Reglas de negocio no negociables
@@ -59,7 +62,7 @@ La tabla fija la intención; `.claude/settings.json` (commitéalo) la aplica de 
 | 5 | Pago parcial: faltante queda en su cuota; excedente a la siguiente cuota, cronológicamente |
 | 6 | Mora = cálculo derivado; nunca genera cobro automático |
 | 7 | Comando financiero = transacción única + auditoría + idempotencia, todo o nada |
-| 8 | Dinero como enteros; nunca `number`/`float` de JS |
+| 8 | Dinero como enteros: tipo `Money` (entero seguro tipado) en TS, `bigint` en BD; nunca `number` decimal/`float`. Interés en puntos básicos, redondeo half-up |
 | 9 | Escritura financiera solo vía Route Handler → servicio → transacción; nunca desde el navegador |
 
 ## Qué no hacer

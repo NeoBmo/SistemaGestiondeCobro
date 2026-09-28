@@ -1,6 +1,6 @@
 # 03 — Arquitectura técnica
 
-> **Estado: adoptada.** Es la base sobre la que ya se construyó `04-PLAN.md` y sobre la que ya arrancó F0. No se re-discute salvo que una fase posterior demuestre que una pieza concreta no alcanza — en ese caso se documenta el cambio aquí mismo, no se decide en silencio dentro del código.
+> **Estado: adoptada; F0 aún no iniciada.** Es la base sobre la que se construyó `04-PLAN.md`. No se re-discute salvo que una fase posterior demuestre que una pieza concreta no alcanza — en ese caso se documenta el cambio aquí mismo, no se decide en silencio dentro del código.
 
 **Decisión central:** monolito modular. Una aplicación web, una base de datos relacional, límites internos claros entre módulos. Sin microservicios, colas, caché distribuida ni app móvil nativa en V1.
 
@@ -13,12 +13,12 @@
 | Base de datos | PostgreSQL administrado vía Supabase | Dominio relacional, financiero y transaccional: necesita restricciones, transacciones y auditoría |
 | Autenticación | Supabase Auth con sesiones seguras para Next.js | Resuelve credenciales/sesiones sin construir identidad propia |
 | Autorización | Roles en la app + Row Level Security (RLS) por negocio | Dos capas de defensa contra fugas entre negocios |
-| Comandos financieros | Route Handler → servicio de dominio → transacción PostgreSQL | El navegador nunca escribe pagos, cajas o liquidaciones directamente |
+| Comandos financieros | Route Handler → servicio de dominio (TypeScript) → transacción PostgreSQL abierta con el driver `pg` sobre el pooler de Supabase | El navegador nunca escribe pagos, cajas o liquidaciones directamente. `supabase-js` no soporta transacciones multi-sentencia, por eso el servicio usa `pg` directo (ADR 0001) |
 | Despliegue | Vercel (Next.js) + Supabase (BD/Auth) | Reduce operación de infraestructura en V1 |
 | Errores y salud | Registro de errores centralizado + chequeo de disponibilidad | Alimenta el panel de Super Admin sin monitoreo propio complejo |
 | Pruebas | Vitest (dominio) + Playwright (flujos críticos) | Protege reglas financieras y recorridos reales |
 
-Dependencias iniciales: Next.js, React, TypeScript, Tailwind CSS, `@supabase/ssr` + cliente oficial, Zod (validación), React Hook Form (solo formularios complejos), Vitest, Playwright, ESLint + Prettier. No se añade Redux, Zustand, React Query, GraphQL, tRPC, Redis ni una librería de componentes masiva salvo necesidad real demostrada.
+Dependencias iniciales: Next.js, React, TypeScript, Tailwind CSS, `@supabase/ssr` + cliente oficial, `pg` + `@types/pg`, Zod (validación), React Hook Form (solo formularios complejos), Vitest, Playwright, ESLint + Prettier. No se añade Redux, Zustand, React Query, GraphQL, tRPC, Redis ni una librería de componentes masiva salvo necesidad real demostrada.
 
 ## 2. Estructura de carpetas
 
@@ -43,11 +43,14 @@ src/
 │   └── audit/                # eventos auditables
 ├── shared/
 │   ├── ui/ validation/ auth/ database/
+│   ├── errors/ types/ money/ dates/ ids/
 └── tests/
     ├── unit/ integration/ e2e/
 ```
 
 Cada módulo contiene sus tipos, validaciones, servicios, consultas y pruebas. **Una página no calcula interés, mora, saldos ni permisos: llama al servicio del módulo correspondiente.**
+
+**Convención de nombres:** código y base de datos en inglés (`snake_case` en BD, `camelCase` en TS); documentación y UI en español. La correspondencia término de dominio → identificador vive en `08-GLOSARIO.md`.
 
 ## 3. Patrón obligatorio para operaciones financieras
 
@@ -74,7 +77,10 @@ Reglas de implementación:
 
 - Cada comando financiero recibe una clave de idempotencia.
 - `business_id` se obtiene de la sesión y del recurso autorizado en el servidor, nunca de un valor enviado por el navegador.
-- Importes como enteros en unidad mínima de moneda, nunca `number` decimal de JS.
+- Importes como enteros en unidad mínima de moneda. En TypeScript son el tipo `Money` (entero seguro tipado, validado con `Number.isSafeInteger` en cada frontera); en PostgreSQL son `bigint`. Nunca `number` decimal ni `float`. Porcentajes de interés en puntos básicos enteros (20 % = 2000); el interés monetario se redondea half-up.
+- **Concurrencia:** cada comando toma bloqueos explícitos dentro de la transacción — `SELECT … FOR UPDATE` sobre el préstamo y sus cuotas (pagos, reversos, refinanciación) y un bloqueo consultivo (`pg_advisory_xact_lock`) por negocio+caja para todo movimiento que dependa del saldo de Caja Mayor (desembolsos, fondos, liquidaciones), siempre en el mismo orden para evitar interbloqueos.
+- **Idempotencia:** tabla `idempotency_keys`, única por (`business_id`, comando, clave); guarda hash del payload y resultado. Misma clave y mismo hash → se devuelve el resultado guardado sin volver a ejecutar; misma clave y hash distinto → 409. La clave la genera el cliente por intento de usuario y se mantiene estable entre reintentos.
+- **Sistemas distintos:** crear un usuario en Supabase Auth y la transacción de BD no son atómicos entre sí. Orden obligatorio: crear en Auth → transacción de BD → si falla, compensar borrando el usuario de Auth.
 - Fechas en UTC; cada negocio muestra fecha/hora en su zona configurada.
 - Reversos y ajustes son eventos nuevos enlazados al original.
 - Las funciones que escriben dinero no usan caché.
@@ -86,7 +92,9 @@ Reglas de implementación:
 3. Las políticas distinguen Super Admin / admin de negocio / cobrador, y siempre restringen al negocio correcto.
 4. Las tablas financieras no aceptan escrituras directas desde el navegador.
 5. Las claves `service_role` permanecen exclusivamente en el servidor.
-6. Cada consulta se filtra también por contexto de negocio en la capa de aplicación — RLS es una segunda defensa, no un sustituto.
+6. Cada consulta se filtra también por contexto de negocio en la capa de aplicación — RLS es una segunda defensa, no un sustituto. Como los comandos financieros usan una conexión `pg` privilegiada que **no** pasa por RLS, el filtro por `business_id` de la sesión en la capa de aplicación es aquí la defensa principal; RLS protege el acceso vía API de datos de Supabase.
+7. `business_id` y `role` viajan en el JWT (Auth Hook de Supabase) para que las políticas RLS no dependan de joins.
+8. **Inmutabilidad en la base de datos:** las tablas de hechos financieros y de auditoría no admiten `UPDATE` ni `DELETE` — `REVOKE UPDATE, DELETE` para los roles de aplicación más un trigger `forbid_update_delete()` como segunda barrera. Las únicas columnas modificables son las derivadas que se declaren explícitamente por tabla en su migración.
 
 Restricciones físicas que el esquema debe expresar: un contrato confirmado tiene un solo préstamo; una cuota no recibe más dinero que su saldo pendiente; un cobrador solo tiene una ruta activa; un cliente solo tiene una asignación activa; un cobrador solo tiene una jornada abierta/pendiente por día; una clave de idempotencia no se reutiliza; una entidad hija pertenece siempre al mismo negocio que su relación padre. No se acepta una base sin claves foráneas, restricciones y migraciones versionadas.
 
@@ -122,7 +130,7 @@ Una interfaz no se considera terminada hasta que estos recorridos pasan automati
 - No se registran contraseñas, documentos de identidad completos, teléfonos completos ni datos financieros sensibles en logs.
 - Backups: plan administrado de Supabase con copias diarias verificables, **retención de 7 días**, sin recuperación punto-en-el-tiempo en V1; exportación lógica periódica adicional; un backup no está validado hasta que se ha comprobado que puede restaurarse.
 - Moneda: V1 opera en pesos colombianos (COP), sin decimales — los importes se manejan siempre como enteros (unidad mínima = 1 peso). Si en el futuro se soporta una moneda con decimales, revisar `shared/money/money.ts` antes de asumir la unidad mínima actual.
-- Identificadores: `negocio.id` es un UUID v4 interno. El número de contrato es un código secuencial legible por negocio (ej. `CT-000123`), generado por el sistema al confirmar, nunca editable.
+- Identificadores: `negocio.id` es un UUID v4 interno. El número de contrato es un código secuencial legible por negocio (ej. `CT-000123`), generado por el sistema **al confirmar** el contrato (un contrato `BORRADOR` no consume número), mediante un contador por negocio con bloqueo, nunca editable.
 
 ## 8. Secuencia de implementación
 

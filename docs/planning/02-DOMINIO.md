@@ -60,6 +60,8 @@ Eventos: `SuscripcionCreada`, `PlanCambiado`, `SuscripcionVencida`, `NegocioSusp
 ### 1.4 Usuario
 
 Datos: id, nombre visible, usuario, contraseña segura, rol, negocio opcional, estado, fechas de acceso.
+Acceso: el «usuario» es el identificador de inicio de sesión; internamente se mapea a un email sintético para Supabase Auth (no se envían correos). **Un usuario pertenece a un único negocio**: una misma persona en dos negocios tiene dos cuentas independientes.
+Recuperación de contraseña: el admin del negocio restablece la de sus cobradores; el Super Admin restablece la del admin. Todo restablecimiento deja el usuario en `PENDIENTE_CAMBIO_CONTRASENA` y se audita.
 Roles: `SUPER_ADMIN` (sin negocio), `ADMIN_NEGOCIO` (una sola cuenta principal por negocio en V1), `COBRADOR` (pertenece a un negocio, vinculado a un cobrador).
 Estados: `ACTIVO`, `BLOQUEADO`, `PENDIENTE_CAMBIO_CONTRASENA`.
 Reglas: la identificación personal nunca es contraseña; contraseña inicial temporal obliga cambio en primer acceso; un cobrador no actúa sobre otro negocio ni otra cartera.
@@ -79,7 +81,7 @@ Eventos: `ClienteCreado`, `ClienteActualizado`.
 ### 2.2 Contrato
 
 Acuerdo entre negocio y cliente que origina **una única** operación de préstamo en V1.
-Datos: negocio, cliente, número generado automáticamente, fecha/hora, admin creador, comentario opcional, origen (`NUEVO` | `IMPORTADO`), estado.
+Datos: negocio, cliente, número (código legible por negocio, asignado por el sistema al confirmar; un `BORRADOR` no lo tiene), fecha/hora, admin creador, comentario opcional, origen (`NUEVO` | `IMPORTADO`), estado.
 Estados: `BORRADOR` (editable, sin deuda ni movimientos) → `CONFIRMADO` (inmutable, exactamente un préstamo) → `ANULADO` (permanece en historial).
 Reglas: un `CONFIRMADO` no se edita ni elimina; solo se anula si su préstamo no tiene pagos ni liquidaciones posteriores; la anulación exige motivo, auditoría y reversión explícita de cualquier desembolso inicial; la asignación a cobrador no pertenece al contrato y puede cambiar sin alterarlo.
 Eventos: `ContratoCreado`, `ContratoConfirmado`, `ContratoAnulado`.
@@ -87,7 +89,7 @@ Eventos: `ContratoCreado`, `ContratoConfirmado`, `ContratoAnulado`.
 ### 2.3 Préstamo
 
 Obligación financiera resultante de un contrato confirmado.
-Datos: contrato, monto principal, interés % y monetario, total a pagar, fecha de desembolso, primera fecha de cobro, frecuencia (`DIARIA`|`SEMANAL`|`MENSUAL`), cantidad de cuotas, saldo pendiente derivado, préstamo anterior opcional (si viene de refinanciación), estado.
+Datos: contrato, monto principal, interés % (guardado en puntos básicos enteros: 20 % = 2000) y monetario, total a pagar, fecha de desembolso, primera fecha de cobro, frecuencia (`DIARIA`|`SEMANAL`|`MENSUAL`), cantidad de cuotas, saldo pendiente derivado, préstamo anterior opcional (si viene de refinanciación), estado.
 Estados: `ACTIVO` (saldo pendiente) → `PAGADO` (sin saldo en cuotas ni cargos de mora activos) | `REFINANCIADO` (saldo cancelado por préstamo nuevo) | `ANULADO` (anulación válida del contrato).
 Reglas: un contrato confirmado genera un préstamo y su calendario de cuotas; el desembolso de un préstamo nuevo reduce Caja Mayor (no puede confirmarse sin saldo suficiente); un préstamo importado no genera desembolso histórico; un cliente puede tener varios préstamos activos; el total original no se modifica tras confirmar.
 Eventos: `PrestamoCreado`, `PrestamoDesembolsado`, `PrestamoPagado`, `PrestamoRefinanciado`, `PrestamoAnulado`.
@@ -97,14 +99,16 @@ Eventos: `PrestamoCreado`, `PrestamoDesembolsado`, `PrestamoPagado`, `PrestamoRe
 Datos: préstamo, número de orden, fecha de vencimiento, valor esperado, valor aplicado, saldo pendiente derivado, estado.
 Estados: `PENDIENTE` (saldo, no venció) | `PARCIAL` (pago recibido, conserva saldo, no venció) | `VENCIDA` (fecha pasó, conserva saldo) | `PAGADA` (saldo cero). Si una vencida tiene pago parcial: se muestra `VENCIDA — pago parcial`, sin crear un quinto estado.
 Reglas: el calendario se genera al confirmar el préstamo; la suma de cuotas = total a pagar exacto (el único ajuste de redondeo va en la última cuota, y solo al crearla — nunca por pagos posteriores); los pagos no cambian valor esperado ni fecha de las cuotas; una cuota pagada conserva su historial de atraso.
-Eventos: `CuotasGeneradas`, `CuotaVencida`, `CuotaPagada`.
+Eventos: `CuotasGeneradas`, `CuotaPagada`. El estado `VENCIDA` es **derivado** (no es un evento persistido ni requiere un proceso programado): una cuota con saldo está vencida cuando la fecha de hoy, en la zona horaria del negocio, es posterior a su fecha de vencimiento. Coherente con los días de mora: una cuota que vence hoy tiene 0 días de mora.
 
 ### Cálculo confirmado
 
 ```text
-interés monetario = monto principal × interés % (20 % por defecto, configurable al crear la operación)
+interés monetario = redondeo half-up(monto principal × interés bps / 10000)   (20 % = 2000 bps por defecto, configurable al crear la operación; admite medios puntos, ej. 12,5 % = 1250 bps)
 total a pagar      = monto principal + interés monetario
 ```
+
+El redondeo del interés se aplica una sola vez, al crear el préstamo, y el total resultante es exacto e inmutable.
 
 Ejemplo: $1.000.000 al 20 % → total $1.200.000; en 12 cuotas → cuota esperada $100.000.
 Cantidades frecuentes de cuotas: 6, 12, 24 (configurable). Frecuencia diaria es el caso habitual.
@@ -222,7 +226,7 @@ Una por negocio. **No se guarda un saldo manual como fuente de verdad** — se d
 Caja operativa de un cobrador durante una jornada (no una caja con saldo permanente).
 Datos: negocio, cobrador, fecha, fondo operativo recibido, saldo esperado derivado, dinero entregado, diferencia derivada, estado, fechas de apertura/cierre.
 Estados: `ABIERTA` → `PENDIENTE_LIQUIDACION` → `LIQUIDADA` | `LIQUIDADA_CON_DIFERENCIA`.
-Reglas: máximo una jornada abierta/pendiente por cobrador por día; inicia en cero y recibe fondo desde Caja Mayor; liquidada queda en cero; no se registran pagos/gastos en jornada cerrada.
+Reglas: máximo una jornada abierta/pendiente por cobrador por día; inicia en cero y recibe fondo desde Caja Mayor; liquidada queda en cero; no se registran pagos/gastos en jornada cerrada. Un cobrador **no puede registrar cobros ni gastos sin una jornada `ABIERTA`**, y **no puede abrir una jornada nueva mientras tenga otra en `PENDIENTE_LIQUIDACION`, de cualquier día**.
 
 ### 5.3 Movimiento de caja
 
@@ -307,6 +311,14 @@ Se crea para: contratos, préstamos, pagos, cargos de mora, rutas, asignaciones,
 | Registrar gasto | No | Sí | Sí (solo su jornada) |
 | Transferir fondo, confirmar liquidación, ajustar caja | No | Sí | No |
 | Crear / gestionar ticket | No / Sí | Sí / No | No / No |
+| Abrir su propia jornada de Caja Menor | No | No | Sí |
+| Declarar su liquidación | No | No | Sí |
+| Registrar intento de cobro / volver a cobrar | No | No | Sí (solo su cartera) |
+| Anular cargo de mora | No | Sí | No |
+| Cerrar ruta, reasignar cliente | No | Sí | No |
+| Importar cartera | No | Sí | No |
+| Ver dashboard del negocio | No | Sí | No |
+| Restablecer contraseña de usuario | Solo de admins | Solo de sus cobradores | No |
 
 ---
 
@@ -324,3 +336,4 @@ Se crea para: contratos, préstamos, pagos, cargos de mora, rutas, asignaciones,
 10. Ningún hecho financiero se elimina: corrección = reverso o ajuste vinculado.
 11. Dashboard, prioridad, mora y reputación nunca son fuente primaria de verdad.
 12. Ninguna acción puede modificar información de un negocio ajeno.
+13. Un cobrador solo registra cobros y gastos con una jornada `ABIERTA`, y no abre una jornada nueva con otra en `PENDIENTE_LIQUIDACION`.
