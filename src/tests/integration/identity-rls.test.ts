@@ -124,16 +124,32 @@ describe("RLS de identidad", () => {
       const s = await seed(client);
       await asApiUser(client, claimsOf(s, "superAdmin"));
 
+      // Se filtra por lo sembrado: la base local puede contener datos de otras pruebas.
+      const ids = `('${s.a}', '${s.b}')`;
       expect(
-        await names(client, "select name as label from public.businesses order by name"),
+        await names(
+          client,
+          `select name as label from public.businesses where id in ${ids} order by name`,
+        ),
       ).toEqual(["Negocio A", "Negocio B"]);
-      expect(await names(client, "select username as label from public.profiles")).toHaveLength(4);
       expect(
-        await names(client, "select id::text as label from public.subscriptions"),
+        await names(
+          client,
+          `select username as label from public.profiles where business_id in ${ids} or role = 'SUPER_ADMIN' and id = '${s.superAdmin}'`,
+        ),
+      ).toHaveLength(4);
+      expect(
+        await names(
+          client,
+          `select id::text as label from public.subscriptions where business_id in ${ids}`,
+        ),
       ).toHaveLength(2);
-      expect(await names(client, "select action as label from public.audit_events")).toHaveLength(
-        3,
-      );
+      expect(
+        await names(
+          client,
+          "select action as label from public.audit_events where action like 'Evento%'",
+        ),
+      ).toHaveLength(3);
     });
   });
 
