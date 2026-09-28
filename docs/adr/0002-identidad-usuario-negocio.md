@@ -17,5 +17,5 @@ Supabase Auth exige email o teléfono como identificador, pero el dominio define
 ## Consecuencias
 
 - Sin tabla de membresías: `business_id` y `role` del JWT bastan para RLS.
-- El dominio del email sintético debe ser reservado/no enrutable y fijarse en configuración.
+- El dominio del email sintético se fija en configuración (`AUTH_SYNTHETIC_EMAIL_DOMAIN`). **Riesgo por verificar en F1:** Supabase Auth (alojado) puede rechazar emails de dominios reservados o sin registros MX; si ocurre, usar un dominio propio con MX o repensar el identificador.
 - Si en el futuro se requiere multi-negocio por persona, se necesitará una ADR nueva y migración de identidad.
