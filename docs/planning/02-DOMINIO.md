@@ -66,7 +66,7 @@ Acceso: el «usuario» es el identificador de inicio de sesión; internamente se
 Recuperación de contraseña: el admin del negocio restablece la de sus cobradores; el Super Admin restablece la del admin. Todo restablecimiento deja el usuario en `PENDIENTE_CAMBIO_CONTRASENA` y se audita.
 Roles: `SUPER_ADMIN` (sin negocio), `ADMIN_NEGOCIO` (una sola cuenta principal por negocio en V1), `COBRADOR` (pertenece a un negocio, vinculado a un cobrador).
 Estados: `ACTIVO`, `BLOQUEADO`, `PENDIENTE_CAMBIO_CONTRASENA`.
-Reglas: la identificación personal nunca es contraseña; contraseña inicial temporal obliga cambio en primer acceso; un cobrador no actúa sobre otro negocio ni otra cartera.
+Reglas: la identificación personal nunca es contraseña; contraseña inicial temporal obliga cambio en primer acceso; política de contraseña: 8 o más caracteres con al menos una letra y un dígito (ADR 0004); un cobrador no actúa sobre otro negocio ni otra cartera.
 Eventos: `UsuarioCreado`, `PrimerAccesoCompletado`, `InicioSesion`, `UsuarioBloqueado`, `ContrasenaCambiada`.
 
 ---
