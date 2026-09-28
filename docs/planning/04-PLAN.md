@@ -31,15 +31,17 @@ F0 Fundación técnica
 
 Trabajo: Next.js + TS estricto + Tailwind + ESLint/Prettier · estructura por módulos (`03-ARQUITECTURA.md` §2) · variables de entorno validadas al iniciar · proyectos Supabase separados (dev/preview/prod) · CI con typecheck/lint/test/build · Vitest + Playwright configurados · layouts vacíos por área · convenciones de errores, comandos, fechas, dinero e IDs.
 
-Convenciones concretas ya definidas:
+Convenciones concretas **a crear en F0** (ninguna existe todavía):
 
 - Scripts: `typecheck`, `format`, `format:check`, `test`, `test:watch`, `test:e2e`.
+- Archivos de repo: `.nvmrc` (Node 24), `.gitattributes` (`eol=lf`), `.env.example` (solo nombres de variables).
 - `src/shared/errors/app-error.ts` — `AppError { code, message, status }`.
 - `src/shared/types/command-result.ts` — `{ ok: true, data } | { ok: false, error: { code, message } }`.
-- `src/shared/money/money.ts` — enteros en unidad mínima, `formatMoney`/`parseMoneyInput`.
-- `src/shared/dates/dates.ts` — helpers UTC.
+- `src/shared/money/money.ts` — tipo `Money` (entero seguro), `formatMoney`/`parseMoneyInput`, porcentaje en puntos básicos y redondeo half-up.
+- `src/shared/dates/dates.ts` — helpers UTC y conversión a la zona del negocio.
 - `src/shared/ids/idempotency-key.ts` — tipo + validación UUID.
 - Supabase: `supabase-browser.ts`, `supabase-server.ts` (cookies), `supabase-admin.ts` (service role, solo server-side, sin middleware de auth aún).
+- Base de datos: pool `pg` sobre el pooler de Supabase y helper `withTransaction` en `src/shared/database/`; migración base con `forbid_update_delete()`.
 - Rutas mínimas: `/`, `/login` (placeholder), `/super-admin`, `/negocio`, `/cobrador`, `/api/health`.
 
 **Criterios de aceptación:** una persona nueva levanta el proyecto con la documentación del repo · ninguna clave secreta en código ni expuesta al navegador · un cambio genera preview antes de producción · typecheck/lint/test obligatorios para integrar.
@@ -54,7 +56,7 @@ Datos/seguridad: entidades `usuario`, `negocio`, `suscripción`, `plan`, `evento
 
 Interfaz: landing con planes e inicio de sesión · login/logout y cambio obligatorio de contraseña temporal · panel Super Admin para crear negocio · formulario de negocio (responsable, identificación, teléfono, plan con precio placeholder configurable, cuenta admin inicial) · lista de negocios filtrable · activación/suspensión/archivado/cambio de plan con observación.
 
-**Pruebas críticas:** Super Admin crea negocio + cuenta admin inicial · un admin solo entra a su propio negocio · un usuario no lee/altera datos de otro negocio · suspender bloquea, activar restablece · plan semanal no permite un sexto cobrador activo.
+**Pruebas críticas:** Super Admin crea negocio + cuenta admin inicial · un admin solo entra a su propio negocio · un usuario no lee/altera datos de otro negocio · suspender bloquea, activar restablece. (La prueba «plan semanal no permite un sexto cobrador activo» pasa a F5, donde nace la entidad cobrador.)
 
 **Criterio de salida:** negocios aislados, autenticados, con suscripción controlada manualmente — sin cartera todavía.
 
@@ -69,6 +71,8 @@ Trabajo: `caja_mayor`, `movimiento_caja`, soporte `ajuste`/`reverso` · saldo de
 **Pruebas críticas:** saldo de apertura/ingreso calculan correctamente · gasto directo reduce Caja Mayor y audita · reintentar el mismo comando no duplica dinero · usuario no autorizado no registra movimientos.
 
 **Criterio de salida:** control de efectivo del negocio con historial confiable de Caja Mayor.
+
+**Gate previo a F3:** revisar `02-DOMINIO.md` con un operador real de préstamos (recorrido de un contrato, un pago parcial y una liquidación) y registrar los ajustes en el documento antes de construir cartera. Decidir además la política de protección de datos personales antes de almacenar el primer cliente (F3 introduce la primera PII).
 
 ---
 
@@ -104,7 +108,7 @@ Interfaz: registro de pago con aplicación explicable · detalle de cuota (esper
 
 **Objetivo:** cobranza cotidiana desde el perfil operativo y cierre correcto del efectivo diario.
 
-Dominio: `cobrador`, `ruta`, `asignación_cliente`, `evento_cobro`, `jornada_caja_menor`, `gasto`, `liquidación` · creación/activación de cobradores y cuentas · límite de 5 cobradores para plan semanal · una ruta activa por cobrador, una asignación activa por cliente · reasignación con cierre de historial · apertura de jornada, fondo operativo, saldo esperado · pago de cobrador contra su jornada · gastos y ajustes auditados · intento fallido / volver a cobrar · declaración, confirmación y diferencia de liquidación.
+Dominio: `cobrador`, `ruta`, `asignación_cliente`, `evento_cobro`, `jornada_caja_menor`, `gasto`, `liquidación` · creación/activación de cobradores y cuentas · límite de 5 cobradores para plan semanal (con su prueba: un sexto cobrador activo es rechazado) · una ruta activa por cobrador, una asignación activa por cliente · reasignación con cierre de historial · apertura de jornada, fondo operativo, saldo esperado · pago de cobrador contra su jornada · gastos y ajustes auditados · intento fallido / volver a cobrar · declaración, confirmación y diferencia de liquidación.
 
 Interfaz: admin — gestión de cobradores/rutas/asignaciones/fondos · cobrador — mobile-first, meta diaria, Caja Menor, lista priorizada, detalle de cliente · llamada/WhatsApp/mapas por enlaces profundos · formulario rápido de pago/intento/reintento/gasto · admin — revisión y confirmación de liquidación.
 
@@ -118,7 +122,7 @@ Interfaz: admin — gestión de cobradores/rutas/asignaciones/fondos · cobrador
 
 **Objetivo:** convertir datos confiables en información de decisión, sin reglas nuevas.
 
-Trabajo: consultas/vistas de lectura para saldos, cartera, mora, cajas, rendimiento · prioridad de clientes (mora activa máxima, saldo vencido, vencimiento más antiguo) · historial de comportamiento sin scoring · dashboard predefinido (semanal) y configurable (mensual/anual) · filtros de cartera · alertas de vencido/caja pendiente/diferencia/suscripción · garantía de que ningún dashboard escribe balances.
+Trabajo: consultas/vistas de lectura para saldos, cartera, mora, cajas, rendimiento · prioridad de clientes (mora activa máxima, saldo vencido, vencimiento más antiguo) · historial de comportamiento sin scoring · dashboard predefinido (semanal) y configurable (mensual/anual) · filtros de cartera · alertas de vencido/caja pendiente/diferencia/suscripción · garantía de que ningún dashboard escribe balances · seed de datos representativos (volumen realista) para medir consultas e índices.
 
 **Pruebas críticas:** prioridad coincide con detalle real de cuotas/mora · dashboard y Caja Mayor consistentes con movimientos · usuario semanal no modifica dashboard · usuarios mensual/anual solo configuran presentación.
 
@@ -161,6 +165,8 @@ Trabajo: revisión de RLS/permisos/rutas protegidas · pruebas de aislamiento en
 | Rendimiento | Medir consultas reales; indexar por negocio, estado, fecha, relaciones usadas |
 | Documentación | Si una decisión funcional cambia, se actualiza el documento correspondiente antes de programarla |
 | Despliegue | Toda migración pasa por local → preview → producción con respaldo verificado |
+| Accesibilidad | Cada UI cumple `.claude/rules/frontend-design.md` §2 al entregarse; F8 solo audita, no introduce |
+| Datos reales | Ningún dato real entra al sistema sin simulacro de restauración de backup superado y política de datos personales definida |
 
 ## Criterio general de "terminado"
 

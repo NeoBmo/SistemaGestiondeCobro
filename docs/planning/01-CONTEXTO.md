@@ -37,7 +37,7 @@ Aplicación
 | **Cobrador** | Usuario operativo de un único negocio. Trabaja solo sobre su cartera asignada: consulta obligaciones, contacta, registra pagos/intentos, administra su jornada de Caja Menor, registra gastos y liquida. |
 | **Cliente** | Persona a quien el negocio presta dinero. No es usuario de la aplicación en V1. Puede tener varios contratos y préstamos activos. |
 
-**Aislamiento obligatorio:** los datos financieros y operativos de cada negocio son estrictamente independientes. Una persona puede asociarse a más de un negocio sin que eso permita mezclar datos.
+**Aislamiento obligatorio:** los datos financieros y operativos de cada negocio son estrictamente independientes. Cada cuenta de usuario pertenece a un único negocio; una misma persona que opere en dos negocios tiene dos cuentas separadas, sin que eso permita mezclar datos.
 
 ## Alcance de V1
 
