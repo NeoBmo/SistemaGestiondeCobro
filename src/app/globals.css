@@ -1,1 +1,51 @@
 @import "tailwindcss";
+
+/*
+ * Tokens semánticos (frontend-design.md §6): se definen aquí una sola vez y se
+ * reutilizan en todo el proyecto. Contraste AA verificado sobre fondo blanco:
+ * foreground 17.7:1, muted 7.6:1, success 5.0:1, warning 5.0:1, danger 6.5:1.
+ * El color nunca es el único portador de significado: siempre va con texto o ícono.
+ */
+@theme {
+  --color-background: #ffffff;
+  --color-surface: #f3f4f6;
+  --color-foreground: #111827;
+  --color-muted: #4b5563;
+  --color-border: #6b7280;
+  --color-primary: #1d4ed8;
+  --color-primary-foreground: #ffffff;
+  --color-focus: #1d4ed8;
+
+  --color-success: #15803d;
+  --color-success-subtle: #dcfce7;
+  --color-success-strong: #166534;
+  --color-warning: #b45309;
+  --color-warning-subtle: #fef3c7;
+  --color-warning-strong: #92400e;
+  --color-danger: #b91c1c;
+  --color-danger-subtle: #fee2e2;
+  --color-danger-strong: #991b1b;
+}
+
+@layer base {
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
