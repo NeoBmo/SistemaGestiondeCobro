@@ -23,6 +23,14 @@ export function createTestPool(): pg.Pool {
   return new Pool({ connectionString: TEST_DATABASE_URL, max: 5 });
 }
 
+/** Cliente conectado como otro rol de Postgres (misma contraseña local), p. ej. `supabase_auth_admin`. */
+export function createRoleClient(role: string): pg.Client {
+  assertLocalDatabase(TEST_DATABASE_URL);
+  const url = new URL(TEST_DATABASE_URL);
+  url.username = role;
+  return new pg.Client({ connectionString: url.toString() });
+}
+
 /** Ejecuta `fn` en una transacción que siempre se revierte: el DDL de prueba no deja rastro. */
 export async function withRollback<T>(
   pool: pg.Pool,
