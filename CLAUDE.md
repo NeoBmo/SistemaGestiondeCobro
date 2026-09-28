@@ -6,21 +6,21 @@ Plataforma web multi-negocio para negocios que prestan dinero y cobran cuotas me
 
 ## Stack (pinnear exacto en package.json al iniciar F0)
 
-> Las versiones de la tabla son objetivo, no verdad: en F0-T1 resolverlas con `npm view` y verificar compatibilidad (p. ej. next/react) antes de fijarlas exactas. Si difieren, actualizar esta tabla.
+> Política: última versión compatible, exacta en `package.json` (resuelta con `npm view` en F0-T1, 2026-09-27). Las marcadas «se fija en T0.4» aún no están instaladas. Desviaciones deliberadas: TypeScript 6.0.x porque `typescript-eslint` exige `<6.1` (TS 7 rompe el lint); ESLint 9 porque `eslint-plugin-react` (dentro de `eslint-config-next`) no funciona con ESLint 10 — revisar al actualizar `eslint-config-next`.
 
 | Capa | Paquete | Versión |
 | --- | --- | --- |
 | Runtime | Node.js | 24 LTS |
-| Framework | next | 16.2.x |
-| UI | react / react-dom | 19.1.x |
-| Lenguaje | typescript | 5.7.x |
-| Estilos | tailwindcss | 4.1.x |
-| BD / Auth | @supabase/ssr, @supabase/supabase-js | ^2.x |
-| Transacciones | pg, @types/pg | ^8.x |
-| Validación | zod | ^3.23 |
-| Test unitario | vitest | ^2.x |
-| Test e2e | @playwright/test | ^1.48 |
-| Calidad | eslint 9, prettier 3 | latest |
+| Framework | next | 16.3.6 |
+| UI | react / react-dom | 19.3.0 |
+| Lenguaje | typescript | 6.0.3 |
+| Estilos | tailwindcss (+ @tailwindcss/postcss) | 4.3.3 |
+| BD / Auth | @supabase/ssr, @supabase/supabase-js | ^2.x (se fija en T0.4) |
+| Transacciones | pg, @types/pg | ^8.x (se fija en T0.4) |
+| Validación | zod | 4.x (se fija en T0.4) |
+| Test unitario | vitest | 5.0.2 |
+| Test e2e | @playwright/test | 1.63.0 |
+| Calidad | eslint, prettier, prettier-plugin-tailwindcss | 9.39.5, 3.9.9, 0.8.1 |
 
 ## Comandos
 

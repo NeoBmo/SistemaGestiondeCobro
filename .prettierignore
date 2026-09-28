@@ -1,0 +1,11 @@
+.next/
+node_modules/
+coverage/
+playwright-report/
+test-results/
+package-lock.json
+next-env.d.ts
+# La documentación y la configuración de Claude Code se editan a mano
+docs/
+.claude/
+*.md
