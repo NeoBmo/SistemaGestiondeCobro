@@ -21,8 +21,8 @@ Este proyecto tiene un riesgo específico de "código espagueti": mezclar la cap
 
 | Skill | Uso |
 | --- | --- |
-| `nueva-entidad-dominio` ⏳ se crea tras F0-T5 (necesita las convenciones reales) | Scaffolding de una entidad nueva de `02-DOMINIO.md`: tipos, validación Zod, migración base, servicio vacío, carpeta de pruebas — siguiendo la estructura de `03-ARQUITECTURA.md` §2. |
-| `nuevo-comando-financiero` ⏳ se crea tras F0-T5 (necesita las convenciones reales) | Scaffolding de un comando financiero completo (Route Handler + servicio + transacción + auditoría + prueba de integración) a partir del patrón de `03-ARQUITECTURA.md` §3. |
+| `nueva-entidad-dominio` ✅ `.claude/skills/nueva-entidad-dominio/SKILL.md` | Scaffolding de una entidad nueva de `02-DOMINIO.md`: tipos, validación Zod, migración base, servicio vacío, carpeta de pruebas — siguiendo la estructura de `03-ARQUITECTURA.md` §2. |
+| `nuevo-comando-financiero` ✅ `.claude/skills/nuevo-comando-financiero/SKILL.md` (el runner común llega en F2) | Scaffolding de un comando financiero completo (Route Handler + servicio + transacción + auditoría + prueba de integración) a partir del patrón de `03-ARQUITECTURA.md` §3. |
 | `checklist-de-fase` ✅ `.claude/skills/checklist-de-fase/SKILL.md` | Imprime los criterios de aceptación de la fase activa de `04-PLAN.md` para revisión manual antes de merge. |
 | `revisar-pendientes` ✅ `.claude/skills/revisar-pendientes/SKILL.md` | Recorre `05-PENDIENTES.md` y avisa si algo en el diff actual toca una de esas áreas. |
 
