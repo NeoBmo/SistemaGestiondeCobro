@@ -8,7 +8,7 @@
 
 **Para cerrar F0** (verificado por `verificador-de-fase`: el código cumple; faltan acciones fuera del repo):
 
-- [ ] CI en verde en GitHub (primera ejecución real en el PR de T0.6).
+- [x] CI en verde en GitHub (verificado en el PR #7 y en el push a `main`: los 3 jobs pasan).
 - [ ] Proteger `main` exigiendo los checks `quality`, `integration` y `e2e` antes de mergear.
 - [ ] Conectar Vercel para previews por PR.
 - [ ] Crear los proyectos Supabase dev, preview y producción (y sus variables de entorno).
