@@ -6,6 +6,13 @@
 
 🚧 **F0 (fundación técnica) en cierre.** Existe el esqueleto de la aplicación (Next.js, rutas base, primitivas compartidas, acceso a datos, migración base, pruebas y CI) pero **ninguna función de negocio todavía**. El siguiente paso es F1 (identidad, negocios y suscripciones), descrito en `docs/planning/04-PLAN.md`.
 
+**Para cerrar F0** (verificado por `verificador-de-fase`: el código cumple; faltan acciones fuera del repo):
+
+- [ ] CI en verde en GitHub (primera ejecución real en el PR de T0.6).
+- [ ] Proteger `main` exigiendo los checks `quality`, `integration` y `e2e` antes de mergear.
+- [ ] Conectar Vercel para previews por PR.
+- [ ] Crear los proyectos Supabase dev, preview y producción (y sus variables de entorno).
+
 ## Qué es
 
 Una plataforma web multi-negocio para negocios que prestan dinero y cobran cuotas mediante cobradores. No es un simple registro de cobros diarios: centraliza la cartera de clientes, préstamos y cuotas, la operación de los cobradores en ruta, y el movimiento financiero completo del negocio (Caja Mayor, cajas de cobradores, gastos y liquidaciones).
