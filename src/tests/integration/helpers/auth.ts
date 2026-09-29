@@ -53,6 +53,12 @@ export class TestFixtures {
     private readonly admin: SupabaseClient,
   ) {}
 
+  /** Registra lo que creó un comando bajo prueba para que `purge` también lo elimine. */
+  track(created: { businessId?: string; userId?: string }): void {
+    if (created.businessId) this.businessIds.push(created.businessId);
+    if (created.userId) this.userIds.push(created.userId);
+  }
+
   async business(name = "Negocio de prueba"): Promise<string> {
     const unique = `${name} ${randomUUID().slice(0, 8)}`;
     const client = await this.pool.connect();
@@ -148,15 +154,17 @@ export class TestFixtures {
       await client.query("begin");
       await client.query("alter table public.audit_events disable trigger append_only_row");
       await client.query(
-        "delete from public.audit_events where actor_id = any($1) or business_id = any($2)",
+        `delete from public.audit_events
+          where actor_id = any($1) or business_id = any($2) or entity_id = any($1) or entity_id = any($2)`,
         [this.userIds, this.businessIds],
       );
       await client.query("alter table public.audit_events enable trigger append_only_row");
-      await client.query("delete from public.profiles where id = any($1)", [this.userIds]);
-      await client.query("delete from auth.users where id = any($1)", [this.userIds]);
+      // Las suscripciones primero: `changed_by` apunta a perfiles (p. ej. el Super Admin de la prueba).
       await client.query("delete from public.subscriptions where business_id = any($1)", [
         this.businessIds,
       ]);
+      await client.query("delete from public.profiles where id = any($1)", [this.userIds]);
+      await client.query("delete from auth.users where id = any($1)", [this.userIds]);
       await client.query("delete from public.businesses where id = any($1)", [this.businessIds]);
       await client.query("commit");
     } catch (error) {
