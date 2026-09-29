@@ -39,6 +39,31 @@ export function daysBetween(from: IsoDate, to: IsoDate): number {
   return Math.round((utcMs(to) - utcMs(from)) / MS_PER_DAY);
 }
 
+/** Suma (o resta, si es negativo) días calendario. */
+export function addDays(date: IsoDate, days: number): IsoDate {
+  return isoDate(new Date(utcMs(date) + days * MS_PER_DAY).toISOString().slice(0, 10));
+}
+
+function lastDayOfMonth(year: number, monthIndex: number): number {
+  const date = new Date(0);
+  date.setUTCFullYear(year, monthIndex + 1, 0);
+  return date.getUTCDate();
+}
+
+/**
+ * Suma meses conservando el día del mes; si ese día no existe en el mes destino usa el último
+ * (31 ene + 1 mes = 28/29 feb). Siempre parte de la fecha original, sin acumular el ajuste.
+ */
+export function addMonthsClamped(date: IsoDate, months: number): IsoDate {
+  const [year = 0, month = 1, day = 1] = date.split("-").map(Number);
+  const total = year * 12 + (month - 1) + months;
+  const targetYear = Math.floor(total / 12);
+  const targetMonthIndex = ((total % 12) + 12) % 12;
+  const targetDay = Math.min(day, lastDayOfMonth(targetYear, targetMonthIndex));
+  const pad = (value: number, length: number) => String(value).padStart(length, "0");
+  return isoDate(`${pad(targetYear, 4)}-${pad(targetMonthIndex + 1, 2)}-${pad(targetDay, 2)}`);
+}
+
 function partsIn(instant: Date, timeZone: string, options: Intl.DateTimeFormatOptions) {
   try {
     return new Intl.DateTimeFormat("en-US", { timeZone, ...options }).formatToParts(instant);

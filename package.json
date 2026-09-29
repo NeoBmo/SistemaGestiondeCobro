@@ -20,7 +20,8 @@
     "test:e2e": "playwright test",
     "db:start": "supabase start",
     "db:stop": "supabase stop",
-    "db:migrate": "supabase migration up"
+    "db:migrate": "supabase migration up",
+    "admin:create-super-admin": "node --env-file=.env.local scripts/create-super-admin.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "0.12.7",
