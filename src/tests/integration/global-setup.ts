@@ -1,5 +1,38 @@
+import { execFileSync } from "node:child_process";
 import pg from "pg";
 import { TEST_DATABASE_URL, assertLocalDatabase } from "./helpers/db";
+
+/** Deja en process.env la URL y las claves del Supabase local para las pruebas que usan Auth. */
+function loadSupabaseEnv(): void {
+  const names = {
+    TEST_SUPABASE_URL: "API_URL",
+    TEST_SUPABASE_ANON_KEY: "ANON_KEY",
+    TEST_SUPABASE_SERVICE_ROLE_KEY: "SERVICE_ROLE_KEY",
+  } as const;
+  if (Object.keys(names).every((name) => process.env[name])) return;
+
+  let output: string;
+  try {
+    output = execFileSync("npx", ["supabase", "status", "-o", "env"], {
+      encoding: "utf8",
+      shell: true,
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+  } catch {
+    throw new Error("No se pudo leer `supabase status`. ¿Está corriendo `npm run db:start`?");
+  }
+
+  const values = new Map<string, string>();
+  for (const line of output.split("\n")) {
+    const match = /^([A-Z_]+)="(.*)"$/.exec(line.trim());
+    if (match?.[1] && match[2] !== undefined) values.set(match[1], match[2]);
+  }
+  for (const [envName, statusName] of Object.entries(names)) {
+    const value = values.get(statusName);
+    if (!value) throw new Error(`\`supabase status\` no devolvió ${statusName}.`);
+    process.env[envName] ??= value;
+  }
+}
 
 /** Falla rápido y con un mensaje accionable si la base local no está lista. */
 export default async function setup() {
@@ -28,4 +61,6 @@ export default async function setup() {
   } finally {
     await client.end();
   }
+
+  loadSupabaseEnv();
 }
