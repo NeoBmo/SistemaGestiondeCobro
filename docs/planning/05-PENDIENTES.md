@@ -31,6 +31,8 @@ La mayoría de las decisiones de V1 ya están cerradas y viven en `02-DOMINIO.md
 | Valores de `audit_events.result` (hoy `OK`/`RECHAZADO`; 02 §6.3 solo dice «resultado») y qué ve cada rol (hoy: el Admin lee la suscripción y la auditoría de su negocio; el Cobrador no lee negocio, suscripción ni auditoría) | F1 |
 | Re-suscripción tras `ARCHIVADA`: hoy `unique(business_id)` permite una sola suscripción por negocio y `ARCHIVADA` es terminal; confirmar que «archivada = baja definitiva» | F1 |
 | ¿Puede cambiar el rol, el negocio o el nombre de usuario de un perfil? (hoy inmutables por trigger; un cambio de rol exigiría refrescar el JWT) | F5 |
+| Restablecer la contraseña del admin de un negocio (02 §1.4: «Super Admin restablece la del admin»): sin esto, un `createBusiness` cuya respuesta 201 se pierde deja la contraseña temporal irrecuperable y sin forma de reintentar sin abrir el negocio a mano | Antes de producción (F8), idealmente F1 |
+| `scripts/create-super-admin.mjs` es la única vía para crear un Super Admin y no queda registro de quién lo ejecutó (persona de confianza con `.env.local`/service role); revisar antes de operar con datos reales si se necesita más control (motivo, actor del sistema operativo, límite de uso) | F8 |
 
 ## Explícitamente NO pendiente (ya decidido, no volver a abrir)
 
