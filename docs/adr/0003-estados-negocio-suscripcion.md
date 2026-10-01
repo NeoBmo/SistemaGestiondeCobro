@@ -12,12 +12,13 @@
 
 - `businesses.access_status` es la única compuerta de acceso. `subscriptions.status` almacena `ACTIVA`/`SUSPENDIDA`/`ARCHIVADA`; `PROXIMA_A_VENCER` y `VENCIDA` se derivan de las fechas al leer (mismo criterio que `CuotaVencida`).
 - Suspender, activar y archivar cambian ambos campos en una sola transacción; archivar es terminal y deja el negocio bloqueado.
+- Un negocio archivado puede volver por re-suscripción, con una suscripción nueva (ADR 0005).
 - Nombre de usuario único en toda la plataforma.
 - `businesses.time_zone` (IANA, default `America/Bogota`).
 - Vencimiento por calendario con ajuste al último día del mes.
 
 ## Consecuencias
 
-- Dos campos que deben mantenerse coherentes: se protege con el comando único por transición y con pruebas de integración de la invariante (acceso `ACTIVO` ⇔ suscripción `ACTIVA`).
+- Dos campos que deben mantenerse coherentes: se protege con el comando único por transición y con pruebas de integración de la invariante (acceso `ACTIVO` ⇔ suscripción `ACTIVA`), comprobando siempre la suscripción vigente (ADR 0005).
 - El login del cobrador es solo usuario + contraseña; una colisión de nombre entre negocios se resuelve eligiendo otro nombre.
 - Nada de esto requiere un proceso programado: los estados informativos se calculan al consultar.
