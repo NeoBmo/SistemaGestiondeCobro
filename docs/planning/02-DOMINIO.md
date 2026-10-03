@@ -55,19 +55,20 @@ Eventos: `NegocioCreado`, `NegocioActualizado`, `NegocioSuspendido`, `NegocioAct
 Datos: negocio, plan, fecha inicio, fecha vencimiento, estado, observación, actor de cambio. Cada negocio tiene una suscripción vigente; sus cambios (plan, estado) actualizan esa fila y cada uno se audita con el valor anterior y el nuevo.
 Estados **almacenados**: `ACTIVA` | `SUSPENDIDA` (manual, reversible) | `ARCHIVADA` (manual, terminal). Estados **derivados** por fecha al leer, nunca almacenados: `PROXIMA_A_VENCER` (una suscripción `ACTIVA` a 5 días o menos de su vencimiento) y `VENCIDA` (una `ACTIVA` con vencimiento pasado, según la fecha de hoy en la zona horaria del negocio).
 Vencimiento: `SEMANAL` = inicio + 7 días; `MENSUAL` = mismo día del mes siguiente; `ANUAL` = mismo día del año siguiente; si ese día no existe se usa el último del mes (31 ene → 28/29 feb).
-Sincronía con el Negocio (una sola transacción por comando): suspender → suscripción `SUSPENDIDA` y negocio `SUSPENDIDO`; activar → `ACTIVA` y `ACTIVO`; archivar (solo desde `ACTIVA` o `SUSPENDIDA`, con motivo) → `ARCHIVADA` y negocio `SUSPENDIDO`. Una suscripción `ARCHIVADA` no se reactiva. Cambiar de plan reinicia inicio y vencimiento desde hoy.
-Reglas: `PROXIMA_A_VENCER`/`VENCIDA` son informativos, no bloquean automáticamente. Solo Super Admin cambia entre `ACTIVA`/`SUSPENDIDA`. `ARCHIVADA` es un estado terminal distinto de `SUSPENDIDA`: se usa cuando un negocio se da de baja definitivamente (no se espera que vuelva a `ACTIVA`), mientras que `SUSPENDIDA` sigue siendo reversible. Solo Super Admin archiva, con motivo. Todo cambio se audita.
+Sincronía con el Negocio (una sola transacción por comando): suspender → suscripción `SUSPENDIDA` y negocio `SUSPENDIDO`; activar → `ACTIVA` y `ACTIVO`; archivar (solo desde `ACTIVA` o `SUSPENDIDA`, con motivo) → `ARCHIVADA` y negocio `SUSPENDIDO`. Cambiar de plan reinicia inicio y vencimiento desde hoy.
+Re-suscripción: un negocio archivado puede volver. El Super Admin crea una **suscripción nueva** `ACTIVA` desde hoy, con el plan que elija, y el negocio vuelve a `ACTIVO`; sus cuentas siguen vivas (el Super Admin restablece la del admin si cambió de titular). La fila `ARCHIVADA` **no se reactiva ni se modifica**: queda como historial. Cada negocio tiene como máximo **una suscripción vigente** (las `ARCHIVADA` no cuentan) y la re-suscripción no exige motivo, pero el evento registra el plan y las fechas de la suscripción anterior (ADR 0005).
+Reglas: `PROXIMA_A_VENCER`/`VENCIDA` son informativos, no bloquean automáticamente. Solo Super Admin cambia entre `ACTIVA`/`SUSPENDIDA`. `ARCHIVADA` es un estado terminal distinto de `SUSPENDIDA`: se usa cuando un negocio se da de baja, mientras que `SUSPENDIDA` sigue siendo reversible. Si un negocio archivado vuelve, es por re-suscripción (una suscripción nueva), nunca por reactivar la fila archivada. Solo Super Admin archiva y re-suscribe. Todo cambio se audita.
 Eventos: `SuscripcionCreada`, `PlanCambiado`, `NegocioSuspendido`, `NegocioActivado`, `NegocioArchivado`. (`SuscripcionVencida` deja de ser un evento persistido: es un estado derivado.)
 
 ### 1.4 Usuario
 
 Datos: id, nombre visible, usuario, contraseña segura, rol, negocio opcional, estado, fechas de acceso.
 Acceso: el «usuario» es el identificador de inicio de sesión; internamente se mapea a un email sintético para Supabase Auth (no se envían correos). **Un usuario pertenece a un único negocio**: una misma persona en dos negocios tiene dos cuentas independientes. El nombre de usuario es **único en toda la plataforma** (el login pide solo usuario y contraseña); crear un usuario con un nombre existente en cualquier negocio se rechaza.
-Recuperación de contraseña: el admin del negocio restablece la de sus cobradores; el Super Admin restablece la del admin. Todo restablecimiento deja el usuario en `PENDIENTE_CAMBIO_CONTRASENA` y se audita.
+Recuperación de contraseña: el admin del negocio restablece la de sus cobradores; el Super Admin restablece la del admin. En V1 su alcance es solo la cuenta `ADMIN_NEGOCIO` (los cobradores aún no existen). Todo restablecimiento deja el usuario en `PENDIENTE_CAMBIO_CONTRASENA`, le revoca las sesiones activas y se audita.
 Roles: `SUPER_ADMIN` (sin negocio), `ADMIN_NEGOCIO` (una sola cuenta principal por negocio en V1), `COBRADOR` (pertenece a un negocio, vinculado a un cobrador).
 Estados: `ACTIVO`, `BLOQUEADO`, `PENDIENTE_CAMBIO_CONTRASENA`.
 Reglas: la identificación personal nunca es contraseña; contraseña inicial temporal obliga cambio en primer acceso; política de contraseña: 8 o más caracteres con al menos una letra y un dígito (ADR 0004); un cobrador no actúa sobre otro negocio ni otra cartera.
-Eventos: `UsuarioCreado`, `PrimerAccesoCompletado`, `InicioSesion`, `UsuarioBloqueado`, `ContrasenaCambiada`.
+Eventos: `UsuarioCreado`, `PrimerAccesoCompletado`, `InicioSesion`, `UsuarioBloqueado`, `ContrasenaCambiada`, `ContrasenaRestablecida`.
 
 ---
 
@@ -277,6 +278,7 @@ Prioridad: `ALTA`, `MEDIA`, `BAJA` — campo simple sin SLA de tiempo de respues
 
 Registra la **acción**, no el hecho financiero mismo.
 Datos: negocio opcional, actor, tipo de acción, entidad afectada, id de entidad, fecha/hora, resultado, resumen seguro del cambio.
+Resultado: `OK` (el comando se aplicó) o `RECHAZADO` (el actor estaba autenticado pero no tenía permiso sobre esa entidad). No se auditan los rechazos por datos inválidos ni los intentos de inicio de sesión fallidos (ADR 0005).
 Se crea para: contratos, préstamos, pagos, cargos de mora, rutas, asignaciones, cajas, gastos, liquidaciones, suscripciones, usuarios, tickets.
 
 ---
@@ -304,6 +306,7 @@ Se crea para: contratos, préstamos, pagos, cargos de mora, rutas, asignaciones,
 | Operación | Super Admin | Admin negocio | Cobrador |
 | --- | :---: | :---: | :---: |
 | Crear/suspender negocio, cambiar plan | Sí | No | No |
+| Re-suscribir un negocio archivado | Sí | No | No |
 | Monitoreo global y backups | Sí | No | No |
 | Crear/editar clientes | No | Sí | No |
 | Crear/anular contrato, refinanciar | No | Sí | No |
@@ -321,6 +324,7 @@ Se crea para: contratos, préstamos, pagos, cargos de mora, rutas, asignaciones,
 | Importar cartera | No | Sí | No |
 | Ver dashboard del negocio | No | Sí | No |
 | Restablecer contraseña de usuario | Solo de admins | Solo de sus cobradores | No |
+| Ver auditoría | Sí | Solo la de su negocio | No |
 
 ---
 

@@ -42,6 +42,8 @@ Los valores de estado se guardan como en `02-DOMINIO.md` (`CONFIRMADO`, `PARCIAL
 | Estado de acceso del negocio | `businesses.access_status` (`ACTIVO`, `SUSPENDIDO`) |
 | Zona horaria del negocio | `businesses.time_zone` (IANA, default `America/Bogota`) |
 | Estado almacenado de la suscripción | `subscriptions.status` (`ACTIVA`, `SUSPENDIDA`, `ARCHIVADA`) |
+| Suscripción vigente | La de `status <> 'ARCHIVADA'`; como máximo una por negocio (índice único parcial, ADR 0005) |
+| Resultado de un evento de auditoría | `audit_events.result` (`OK`, `RECHAZADO`) |
 | Inicio / vencimiento | `subscriptions.starts_on` / `subscriptions.expires_on` (fecha calendario) |
 | Rol | `profiles.role` (`SUPER_ADMIN`, `ADMIN_NEGOCIO`, `COBRADOR`) |
 | Nombre de usuario (único global) | `profiles.username` |
