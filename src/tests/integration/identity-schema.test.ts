@@ -259,7 +259,10 @@ describe("audit_events (02 §6.3): solo agregado", () => {
         expect((await attempt(client, statement))?.code, statement).toBe(RESTRICT_VIOLATION);
       }
 
-      const { rows } = await client.query("select count(*)::int as total from public.audit_events");
+      // Solo las filas de esta prueba (`entity_type = 'test'`): la tabla puede tener otros eventos.
+      const { rows } = await client.query(
+        "select count(*)::int as total from public.audit_events where entity_type = 'test'",
+      );
       expect(rows[0]?.total).toBe(2);
     });
   });
