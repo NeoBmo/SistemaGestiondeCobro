@@ -92,7 +92,7 @@ describe("completeFirstPasswordChange: endurecimiento", () => {
     expect((await otherDevice.auth.refreshSession()).error).not.toBeNull();
   });
 
-  it("si la BD falla tras cambiar la contraseña, sigue PENDIENTE y se reintenta con otra distinta", async () => {
+  it("si la BD cae antes de empezar, Auth no se toca y se reintenta con la misma contraseña", async () => {
     const { account, context, client } = await pendingUser();
     const brokenDb = {
       connect: async () => {
@@ -104,6 +104,37 @@ describe("completeFirstPasswordChange: endurecimiento", () => {
     await expect(
       completeFirstPasswordChange({ supabase: client, db: brokenDb }, context, "NuevaClave2026"),
     ).rejects.toThrow("BD caída");
+    expect(await statusOf(account.userId)).toBe("PENDIENTE_CAMBIO_CONTRASENA");
+
+    // Auth no llegó a cambiar nada: la misma contraseña ahora sí completa el cambio.
+    await completeFirstPasswordChange({ supabase: client, db: pool }, context, "NuevaClave2026");
+    expect(await statusOf(account.userId)).toBe("ACTIVO");
+  });
+
+  it("si la BD falla después de cambiar la contraseña en Auth, sigue PENDIENTE y se reintenta con otra distinta", async () => {
+    const { account, context, client } = await pendingUser();
+    const failingAuditDb = {
+      query: pool.query.bind(pool),
+      connect: async () => {
+        const dbClient = await pool.connect();
+        const original = dbClient.query.bind(dbClient) as (...args: unknown[]) => Promise<unknown>;
+        dbClient.query = ((text: unknown, ...rest: unknown[]) =>
+          typeof text === "string" && text.includes("insert into public.audit_events")
+            ? Promise.reject(new Error("fallo forzado de auditoría"))
+            : original(text, ...rest)) as typeof dbClient.query;
+        const release = dbClient.release.bind(dbClient);
+        dbClient.release = (() => release(true)) as typeof dbClient.release;
+        return dbClient;
+      },
+    } as unknown as PasswordDeps["db"];
+
+    await expect(
+      completeFirstPasswordChange(
+        { supabase: client, db: failingAuditDb },
+        context,
+        "NuevaClave2026",
+      ),
+    ).rejects.toThrow("fallo forzado");
     expect(await statusOf(account.userId)).toBe("PENDIENTE_CAMBIO_CONTRASENA");
 
     const good = { supabase: client, db: pool };
