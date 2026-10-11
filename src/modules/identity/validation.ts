@@ -9,3 +9,6 @@ export const loginSchema = z.object({
 export const firstPasswordChangeSchema = z.object({
   newPassword: z.string().min(1).max(128),
 });
+
+/** Comandos sin datos de entrada (el objetivo sale de la URL): cualquier campo extra se rechaza. */
+export const emptyBodySchema = z.object({}).strict();
