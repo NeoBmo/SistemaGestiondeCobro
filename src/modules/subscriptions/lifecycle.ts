@@ -1,9 +1,10 @@
 import type { Pool } from "pg";
 import { recordAuditEvent } from "@/modules/audit/record-audit-event";
-import { authorizeSession, type SessionContext } from "@/modules/identity/session";
+import { authorizeSuperAdminOnBusiness } from "@/modules/identity/authorize-super-admin";
+import type { SessionContext } from "@/modules/identity/session";
 import { withTransaction, type Tx } from "@/shared/database/with-transaction";
 import { isoDate, localDateIn, type IsoDate } from "@/shared/dates/dates";
-import { AppError, isAppError } from "@/shared/errors/app-error";
+import { AppError } from "@/shared/errors/app-error";
 import { assertTransition, type LifecycleCommand } from "./lifecycle-rules";
 import { isPlanCode, subscriptionExpiry, type PlanCode } from "./plans";
 import type { StoredSubscriptionStatus } from "./subscription-status";
@@ -99,60 +100,14 @@ const AUDIT_ACTION: Record<LifecycleCommand, string> = {
   RESUBSCRIBE: "SuscripcionCreada",
 };
 
-/**
- * Exige Super Admin activo. Si el actor está autenticado pero no tiene permiso sobre un negocio que
- * existe, deja un evento `RECHAZADO` (ADR 0005) antes de devolver 403; si el negocio no existe no hay
- * entidad que auditar y la respuesta es la misma 403, para no revelar qué negocios existen.
- */
-export async function authorizeLifecycle(
+/** Exige Super Admin activo y deja el evento RECHAZADO si no tiene permiso (ver authorize-super-admin.ts). */
+export function authorizeLifecycle(
   deps: LifecycleDeps,
   actor: SessionContext,
   command: LifecycleCommand,
   businessId: string,
 ): Promise<void> {
-  try {
-    authorizeSession(actor, { roles: ["SUPER_ADMIN"] });
-  } catch (error) {
-    if (isAppError(error) && error.code === "FORBIDDEN") {
-      await recordRejection(deps, actor, command, businessId);
-    }
-    throw error;
-  }
-}
-
-async function recordRejection(
-  deps: LifecycleDeps,
-  actor: SessionContext,
-  command: LifecycleCommand,
-  businessId: string,
-): Promise<void> {
-  try {
-    await withTransaction(async (tx) => {
-      const exists = await tx.query("select 1 from public.businesses where id = $1", [businessId]);
-      if ((exists.rowCount ?? 0) === 0) return;
-      // Sin esto, un usuario autenticado podría inundar la auditoría de un negocio repitiendo el intento:
-      // se deja un solo evento por actor, acción y negocio por minuto.
-      const recent = await tx.query(
-        `select 1 from public.audit_events
-          where actor_id = $1 and entity_id = $2 and action = $3 and result = 'RECHAZADO'
-            and occurred_at > now() - interval '1 minute'`,
-        [actor.userId, businessId, AUDIT_ACTION[command]],
-      );
-      if ((recent.rowCount ?? 0) > 0) return;
-      await recordAuditEvent(tx, {
-        businessId,
-        actorId: actor.userId,
-        action: AUDIT_ACTION[command],
-        entityType: "business",
-        entityId: businessId,
-        result: "RECHAZADO",
-        summary: { reason: "FORBIDDEN", role: actor.role },
-      });
-    }, deps.db);
-  } catch {
-    // Auditar el rechazo es de mejor esfuerzo: nunca debe tapar el 403 ni filtrar el motivo del fallo.
-    console.error("[lifecycle] no se pudo registrar el evento RECHAZADO");
-  }
+  return authorizeSuperAdminOnBusiness(deps.db, actor, AUDIT_ACTION[command], businessId);
 }
 
 /** Bloquea el negocio y su suscripción vigente en este orden (03 §3) y devuelve el estado leído. */
