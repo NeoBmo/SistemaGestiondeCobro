@@ -30,6 +30,8 @@ La mayoría de las decisiones de V1 ya están cerradas y viven en `02-DOMINIO.md
 | Un usuario `PENDIENTE_CAMBIO_CONTRASENA` con un JWT vigente puede leer por la API de datos lo que su rol permite (el hook y la RLS no lo distinguen): bloquearlo en el hook o en las políticas | F2 (antes de las tablas de negocio) |
 | ¿Puede cambiar el rol, el negocio o el nombre de usuario de un perfil? (hoy inmutables por trigger; un cambio de rol exigiría refrescar el JWT) | F5 |
 | `scripts/create-super-admin.mjs` es la única vía para crear un Super Admin y no queda registro de quién lo ejecutó (persona de confianza con `.env.local`/service role); revisar antes de operar con datos reales si se necesita más control (motivo, actor del sistema operativo, límite de uso) | F8 |
+| **Supuestos de F1-T4 por confirmar** (el código los aplica; 02 §1.3 no los define): cambiar de plan se permite con la suscripción `ACTIVA` o `SUSPENDIDA` (no `ARCHIVADA`) y no cambia su estado; elegir el mismo plan reinicia el período y sirve de renovación (hoy no existe un flujo de renovación propio); la observación es opcional salvo el motivo de archivado y la nueva sustituye a la anterior en `subscriptions.note` (el historial queda en la auditoría); activar no comprueba el vencimiento (`VENCIDA` es informativa) | Confirmar antes de F8 |
+| Evento `RECHAZADO` (ADR 0005): hoy se deduplica a uno por actor, acción y negocio por minuto, pero un usuario autenticado que conozca un UUID de negocio aún puede dejar eventos en su auditoría; límite de frecuencia por usuario/IP en la aplicación | F8 (junto al límite de intentos de login) |
 
 ## Explícitamente NO pendiente (ya decidido, no volver a abrir)
 

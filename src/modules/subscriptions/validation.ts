@@ -19,3 +19,16 @@ export const createBusinessSchema = z.object({
   adminUsername: z.string().min(1).max(64),
   adminDisplayName: noNullByte("adminDisplayName").pipe(z.string().min(1).max(120)).optional(),
 });
+
+// Ciclo de vida (F1-T4). El servicio vuelve a recortar y acotar el texto; aquí se corta lo evidente.
+const note = noNullByte("La observación").pipe(z.string().max(500));
+
+export const businessIdSchema = z.uuid();
+/** suspender y activar: observación opcional. */
+export const noteBodySchema = z.object({ note: note.optional() });
+/** archivar: el motivo es obligatorio (02-DOMINIO §1.3). */
+export const archiveBodySchema = z.object({
+  reason: noNullByte("El motivo").pipe(z.string().min(1).max(500)),
+});
+/** cambiar de plan y re-suscribir: plan y observación opcional. */
+export const planBodySchema = z.object({ planCode: z.enum(PLAN_CODES), note: note.optional() });
