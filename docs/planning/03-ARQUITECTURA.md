@@ -108,6 +108,8 @@ Restricciones físicas que el esquema debe expresar: un contrato confirmado tien
 - Sin estado global para datos financieros; cada pantalla consulta datos frescos tras un comando exitoso.
 - Super Admin: señales de salud y alertas. Administrador: dashboard, cartera filtrable, controles de caja. Cobrador: mobile-first, botones grandes, lista priorizada.
 - WhatsApp y mapas vía enlaces profundos; sin SDK de mapas ni geolocalización en V1.
+- **Sesión en el navegador:** no hay cliente de Supabase en el navegador; las cookies de sesión son `httpOnly` y todo pasa por Route Handlers y Server Components. `src/proxy.ts` (antes «middleware») solo **refresca** el token antes de renderizar; no decide acceso. Cada página y layout privado llama a `getPageSession`, que lee el perfil y el estado del negocio de la BD y redirige (sin sesión → `/login`; contraseña temporal → `/cambiar-contrasena`; área de otro rol → la propia). Eso es navegación, **no control de acceso**: cada Route Handler y cada comando vuelve a autorizar en el servidor (`requireSession`/servicio), y los layouts no se re-ejecutan al navegar, por eso cada página protegida también comprueba.
+- **Formularios:** componentes cliente mínimos que envían JSON a un Route Handler (`useCommand`) y muestran los cuatro estados; solo se muestra el mensaje que el servidor redactó para el usuario. Los formularios con credenciales declaran `method="post"` para que, si se envían antes de hidratar, nunca viajen en la URL.
 
 ## 6. Pruebas obligatorias
 

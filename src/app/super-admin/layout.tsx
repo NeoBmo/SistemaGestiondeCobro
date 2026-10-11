@@ -1,7 +1,15 @@
-export default function SuperAdminLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+import { getPageSession } from "@/modules/identity/page-session";
+import { PrivateShell } from "@/shared/ui/private-shell";
+
+export const dynamic = "force-dynamic";
+
+export default async function SuperAdminLayout({
+  children,
+}: Readonly<{ children: React.ReactNode }>) {
+  const session = await getPageSession({ roles: ["SUPER_ADMIN"] });
   return (
-    <main id="contenido" className="mx-auto w-full max-w-7xl px-4 py-6">
+    <PrivateShell area="Plataforma" session={session}>
       {children}
-    </main>
+    </PrivateShell>
   );
 }
