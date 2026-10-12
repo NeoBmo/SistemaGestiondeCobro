@@ -61,7 +61,7 @@ export async function runCashCommand<R>(
   command: CashCommand<R>,
 ): Promise<CashCommandOutcome<R>> {
   const { actor } = command;
-  const businessId = await authorizeCashCommand(deps, command);
+  const businessId = await authorizeCashActor(deps, actor, command.name);
 
   try {
     return await withTransaction(async (tx) => {
@@ -169,14 +169,16 @@ async function replay<R>(
 
 /**
  * Solo el Admin de negocio, con la contraseña temporal ya cambiada. Devuelve el negocio de la sesión.
+ * Los Route Handlers lo llaman **antes** de validar la entrada (un actor sin permiso recibe 403, nunca un 400
+ * que le detalle el formato esperado); el ejecutor lo vuelve a aplicar.
  * Un cobrador (autenticado, con negocio) que lo intenta deja un evento `RECHAZADO` sobre la caja de su
  * negocio; el Super Admin no tiene negocio ni caja y recibe el 403 sin evento (ADR 0005).
  */
-async function authorizeCashCommand<R>(
+export async function authorizeCashActor(
   deps: RunCashCommandDeps,
-  command: CashCommand<R>,
+  actor: SessionContext,
+  commandName: string,
 ): Promise<string> {
-  const { actor } = command;
   try {
     authorizeSession(actor, { roles: ["ADMIN_NEGOCIO"] });
   } catch (error) {
@@ -188,7 +190,7 @@ async function authorizeCashCommand<R>(
           actor,
           businessId,
           // Aquí la acción rechazada es el nombre del comando (no el evento que habría generado).
-          action: command.name,
+          action: commandName,
           entityType: "business",
           entityId: businessId,
         },
