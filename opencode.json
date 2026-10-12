@@ -1,0 +1,81 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "permissions": [
+    { "action": "shell", "resource": "*", "effect": "ask" },
+
+    { "action": "shell", "resource": "npm run format*", "effect": "allow" },
+    { "action": "shell", "resource": "npm run typecheck*", "effect": "allow" },
+    { "action": "shell", "resource": "npm run lint*", "effect": "allow" },
+    { "action": "shell", "resource": "npm test*", "effect": "allow" },
+    { "action": "shell", "resource": "npm run test*", "effect": "allow" },
+    { "action": "shell", "resource": "npm run build*", "effect": "allow" },
+    { "action": "shell", "resource": "npm run dev*", "effect": "allow" },
+    { "action": "shell", "resource": "npm run db:start*", "effect": "allow" },
+    { "action": "shell", "resource": "npm run db:stop*", "effect": "allow" },
+    { "action": "shell", "resource": "npm run db:migrate*", "effect": "allow" },
+    { "action": "shell", "resource": "npx vitest run*", "effect": "allow" },
+    { "action": "shell", "resource": "npx playwright test*", "effect": "allow" },
+    { "action": "shell", "resource": "npx supabase status*", "effect": "allow" },
+    { "action": "shell", "resource": "supabase migration new*", "effect": "allow" },
+    { "action": "shell", "resource": "supabase migration list*", "effect": "allow" },
+
+    { "action": "shell", "resource": "git status*", "effect": "allow" },
+    { "action": "shell", "resource": "git diff*", "effect": "allow" },
+    { "action": "shell", "resource": "git log*", "effect": "allow" },
+    { "action": "shell", "resource": "git branch*", "effect": "allow" },
+    { "action": "shell", "resource": "git add*", "effect": "allow" },
+    { "action": "shell", "resource": "git commit*", "effect": "allow" },
+
+    { "action": "shell", "resource": "git push --force*", "effect": "deny" },
+    { "action": "shell", "resource": "git push -f*", "effect": "deny" },
+    { "action": "shell", "resource": "git reset --hard*", "effect": "deny" },
+    { "action": "shell", "resource": "git clean*", "effect": "deny" },
+    { "action": "shell", "resource": "git branch -D*", "effect": "deny" },
+    { "action": "shell", "resource": "cat *.env*", "effect": "deny" },
+    { "action": "shell", "resource": "cat *secrets*", "effect": "deny" },
+    { "action": "shell", "resource": "Get-Content *.env*", "effect": "deny" },
+    { "action": "shell", "resource": "Get-Content *secrets*", "effect": "deny" },
+    { "action": "shell", "resource": "type *.env*", "effect": "deny" },
+
+    { "action": "shell", "resource": "git push*", "effect": "ask" },
+    { "action": "shell", "resource": "git merge*", "effect": "ask" },
+    { "action": "shell", "resource": "npm install*", "effect": "ask" },
+    { "action": "shell", "resource": "npm uninstall*", "effect": "ask" },
+    { "action": "shell", "resource": "npm update*", "effect": "ask" },
+    { "action": "shell", "resource": "supabase db push*", "effect": "ask" },
+    { "action": "shell", "resource": "supabase db reset*", "effect": "ask" },
+    { "action": "shell", "resource": "npx supabase db push*", "effect": "ask" },
+    { "action": "shell", "resource": "npx supabase db reset*", "effect": "ask" },
+    { "action": "shell", "resource": "rm*", "effect": "ask" },
+    { "action": "shell", "resource": "mv*", "effect": "ask" },
+
+    { "action": "read", "resource": "*.env", "effect": "deny" },
+    { "action": "read", "resource": "*.env.*", "effect": "deny" },
+    { "action": "read", "resource": "*secrets/*", "effect": "deny" },
+    { "action": "read", "resource": "*.pem", "effect": "deny" },
+    { "action": "read", "resource": "*.key", "effect": "deny" },
+    { "action": "read", "resource": "*id_rsa", "effect": "deny" },
+    { "action": "read", "resource": "*id_ed25519", "effect": "deny" },
+    { "action": "read", "resource": "*service-account*.json", "effect": "deny" },
+    { "action": "read", "resource": "*.env.example", "effect": "allow" },
+
+    { "action": "edit", "resource": "supabase/migrations/**", "effect": "ask" }
+  ],
+  "skills": [".claude/skills"],
+  "mcp": {
+    "servers": {
+      "chrome-devtools": {
+        "type": "local",
+        "command": ["npx", "-y", "chrome-devtools-mcp"]
+      },
+      "playwright": {
+        "type": "local",
+        "command": ["npx", "-y", "@playwright/mcp"]
+      },
+      "context7": {
+        "type": "local",
+        "command": ["npx", "-y", "@upstash/context7-mcp"]
+      }
+    }
+  }
+}
