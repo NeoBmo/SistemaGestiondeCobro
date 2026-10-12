@@ -97,3 +97,9 @@ export function formatDateTimeInZone(instant: Date, timeZone: string): string {
   const date = `${part(parts, "day")}/${part(parts, "month")}/${part(parts, "year")}`;
   return `${date} ${part(parts, "hour")}:${part(parts, "minute")}`;
 }
+
+/** `dd/mm/aaaa` de una fecha calendario (sin zona: es un día, no un instante). */
+export function formatIsoDate(date: IsoDate): string {
+  const [year, month, day] = date.split("-");
+  return `${day}/${month}/${year}`;
+}

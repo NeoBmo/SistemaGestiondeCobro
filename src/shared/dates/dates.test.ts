@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { AppError } from "../errors/app-error";
-import { daysBetween, formatDateTimeInZone, isoDate, localDateIn } from "./dates";
+import { daysBetween, formatDateTimeInZone, formatIsoDate, isoDate, localDateIn } from "./dates";
 
 describe("isoDate", () => {
   it("acepta fechas calendario válidas YYYY-MM-DD", () => {
@@ -61,5 +61,11 @@ describe("formatDateTimeInZone", () => {
 
     expect(formatDateTimeInZone(instant, "America/Bogota")).toBe("27/09/2026 19:55");
     expect(formatDateTimeInZone(instant, "UTC")).toBe("28/09/2026 00:55");
+  });
+});
+
+describe("formatIsoDate", () => {
+  it("muestra dd/mm/aaaa sin convertir zonas", () => {
+    expect(formatIsoDate(isoDate("2026-10-05"))).toBe("05/10/2026");
   });
 });
