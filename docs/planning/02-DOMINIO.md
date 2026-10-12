@@ -222,7 +222,9 @@ El evento no altera la deuda ni crea una cuota nueva.
 
 ### 5.1 Caja Mayor
 
-Una por negocio. **No se guarda un saldo manual como fuente de verdad** — se deriva de sus movimientos confirmados.
+Una por negocio. **No se guarda un saldo manual como fuente de verdad** — se deriva de sus movimientos.
+
+Reglas (ADR 0006): el saldo de Caja Mayor **nunca queda negativo** — todo movimiento que lo dejaría por debajo de cero (gasto directo, desembolso, fondo, ajuste negativo o reverso de una entrada) se rechaza; un negocio registra **un solo** `SALDO_APERTURA` (los ingresos posteriores de capital son `INGRESO_CAPITAL`; un error en la apertura se corrige con `AJUSTE`/`REVERSO`).
 
 ### 5.2 Jornada de Caja Menor
 
@@ -233,9 +235,9 @@ Reglas: máximo una jornada abierta/pendiente por cobrador por día; inicia en c
 
 ### 5.3 Movimiento de caja
 
-Datos: negocio, fecha/hora, tipo, monto, caja origen/destino opcional, entidad origen, usuario creador, observación, estado.
+Datos: negocio, fecha/hora, tipo, monto, caja origen/destino opcional, entidad origen, usuario creador, observación. **No tiene estado**: todo movimiento registrado es definitivo y cuenta en el saldo (ADR 0006).
 Tipos V1: `SALDO_APERTURA`, `INGRESO_CAPITAL`, `DESEMBOLSO_PRESTAMO`, `FONDO_OPERATIVO`, `COBRO`, `GASTO_COBRADOR`, `GASTO_CAJA_MAYOR`, `LIQUIDACION`, `DIFERENCIA_CAJA`, `AJUSTE`, `REVERSO`.
-Reglas: todo movimiento tiene causa de negocio identificable; no se edita ni elimina — un `REVERSO`/`AJUSTE` nuevo referencia al original y exige motivo; cobro registrado por cobrador aumenta su jornada, uno registrado por admin aumenta Caja Mayor.
+Reglas: todo movimiento tiene causa de negocio identificable; no se edita ni elimina — un `REVERSO`/`AJUSTE` nuevo referencia al original y exige motivo; un `AJUSTE` lleva monto positivo o negativo (dirección explícita) y un `REVERSO` anula por completo un movimiento, una sola vez (lo registra el Admin); cobro registrado por cobrador aumenta su jornada, uno registrado por admin aumenta Caja Mayor.
 
 ### 5.4 Gasto
 
@@ -343,3 +345,4 @@ Se crea para: contratos, préstamos, pagos, cargos de mora, rutas, asignaciones,
 11. Dashboard, prioridad, mora y reputación nunca son fuente primaria de verdad.
 12. Ninguna acción puede modificar información de un negocio ajeno.
 13. Un cobrador solo registra cobros y gastos con una jornada `ABIERTA`, y no abre una jornada nueva con otra en `PENDIENTE_LIQUIDACION`.
+14. El saldo de Caja Mayor nunca es negativo y un movimiento solo se reversa una vez.

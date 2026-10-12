@@ -14,7 +14,6 @@ La mayoría de las decisiones de V1 ya están cerradas y viven en `02-DOMINIO.md
 | Tema | Bloquea |
 | --- | --- |
 | Verificar que Supabase Auth (alojado) acepta el dominio del email sintético (ADR 0002): puede validar dominios/MX | F1 |
-| Estado del `movimiento_caja`: ¿hay estados o todo movimiento registrado es definitivo? (02 §5.3 habla de «movimientos confirmados») | F2 |
 | Política de protección de datos personales y conservación (cédulas, teléfonos, direcciones) | Antes de F3 |
 | Reverso de pago cuando existen pagos posteriores: ¿se reaplican en orden o se bloquea el reverso? | F4 |
 | Reverso o ajuste que impacta una jornada ya `LIQUIDADA`: ¿en qué caja se registra el movimiento? | F4 |
@@ -43,6 +42,6 @@ Política de contraseñas (8+ caracteres con letra y dígito, ADR 0004), estados
 
 Cerrado en F1 (ADR 0005): resultado de la auditoría (`OK`/`RECHAZADO`, y solo cuando el actor autenticado carece de permiso sobre esa entidad; visibilidad por rol en 02 §8), re-suscripción de un negocio archivado (suscripción nueva, la `ARCHIVADA` queda como historial) y restablecimiento de contraseña por el Super Admin (solo la cuenta `ADMIN_NEGOCIO` en V1, con el evento `ContrasenaRestablecida`).
 
-Decisiones técnicas: stack (`03-ARQUITECTURA.md`), retención de backups (7 días), moneda (COP sin decimales), formato de identificadores (UUID interno + código legible de contrato asignado al confirmar), seguridad de Super Admin (mismo flujo Supabase Auth que los demás roles, sin 2FA en V1), umbral de `PROXIMA_A_VENCER` (5 días antes del vencimiento), transacciones con `pg` directo (ADR 0001), 1 usuario = 1 negocio con email sintético (ADR 0002), interés en puntos básicos con redondeo half-up, jornada bloqueante sin cobros ni gastos fuera de una jornada `ABIERTA` (02 §5.2, invariante 13).
+Decisiones técnicas: stack (`03-ARQUITECTURA.md`), retención de backups (7 días), moneda (COP sin decimales), formato de identificadores (UUID interno + código legible de contrato asignado al confirmar), seguridad de Super Admin (mismo flujo Supabase Auth que los demás roles, sin 2FA en V1), umbral de `PROXIMA_A_VENCER` (5 días antes del vencimiento), transacciones con `pg` directo (ADR 0001), 1 usuario = 1 negocio con email sintético (ADR 0002), interés en puntos básicos con redondeo half-up, jornada bloqueante sin cobros ni gastos fuera de una jornada `ABIERTA` (02 §5.2, invariante 13), movimientos de caja siempre definitivos, saldo de Caja Mayor nunca negativo, un solo saldo de apertura por negocio y ajuste ± / reverso total (ADR 0006).
 
 Todo esto ya está en `02-DOMINIO.md` / `03-ARQUITECTURA.md` — si Claude Code encuentra ambigüedad en alguno de estos puntos durante la implementación, es que el documento correspondiente quedó incompleto, no que la decisión siga abierta. En ese caso se corrige el documento, no se inventa en el código.
