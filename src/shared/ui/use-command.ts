@@ -14,9 +14,12 @@ export function useCommand<T = unknown>(url: string) {
   const [state, setState] = useState<CommandState<T>>({ status: "idle" });
 
   const run = useCallback(
-    async (body: unknown): Promise<CommandState<T>> => {
+    async (
+      body: unknown,
+      options?: { headers?: Record<string, string> },
+    ): Promise<CommandState<T>> => {
       setState({ status: "loading" });
-      const result = await postCommand<T>(url, body);
+      const result = await postCommand<T>(url, body, options);
       const next: CommandState<T> = result.ok
         ? { status: "success", data: result.data }
         : { status: "error", error: result.error };

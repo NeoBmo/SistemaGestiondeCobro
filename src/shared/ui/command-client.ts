@@ -33,15 +33,19 @@ export function interpretCommandResponse<T = unknown>(payload: unknown): ClientR
   return { ok: false, error: GENERIC_ERROR };
 }
 
-/** POST JSON a un Route Handler. No lanza: siempre devuelve un resultado interpretable por la UI. */
+/**
+ * POST JSON a un Route Handler. No lanza: siempre devuelve un resultado interpretable por la UI.
+ * `options.headers` añade cabeceras (p. ej. `Idempotency-Key` en los comandos financieros).
+ */
 export async function postCommand<T = unknown>(
   url: string,
   body: unknown,
+  options: { headers?: Record<string, string> } = {},
 ): Promise<ClientResult<T>> {
   try {
     const response = await fetch(url, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { ...options.headers, "content-type": "application/json" },
       body: JSON.stringify(body),
     });
     return interpretCommandResponse<T>(await response.json());
