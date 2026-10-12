@@ -173,6 +173,11 @@ export class TestFixtures {
       for (const table of ledger) {
         await client.query(`alter table public.${table} disable trigger append_only_row`);
       }
+      for (const table of ["installments", "loans", "contracts"]) {
+        await client.query(`delete from public.${table} where business_id = any($1)`, [
+          this.businessIds,
+        ]);
+      }
       await client.query("delete from public.expenses where business_id = any($1)", [
         this.businessIds,
       ]);
@@ -185,6 +190,15 @@ export class TestFixtures {
       await client.query("delete from public.main_cashboxes where business_id = any($1)", [
         this.businessIds,
       ]);
+      // Contador y clientes (el cliente no se elimina en la aplicación: aquí se suspende su trigger).
+      await client.query("delete from public.contract_counters where business_id = any($1)", [
+        this.businessIds,
+      ]);
+      await client.query("alter table public.clients disable trigger clients_protect_identity");
+      await client.query("delete from public.clients where business_id = any($1)", [
+        this.businessIds,
+      ]);
+      await client.query("alter table public.clients enable trigger clients_protect_identity");
       for (const table of ledger) {
         await client.query(`alter table public.${table} enable trigger append_only_row`);
       }

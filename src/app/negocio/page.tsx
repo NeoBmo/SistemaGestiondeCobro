@@ -15,7 +15,7 @@ export default async function NegocioPage() {
     <>
       <h1 className="text-2xl font-semibold md:text-3xl">Negocio</h1>
       <p className="text-muted mt-2 text-sm">
-        Tu cuenta está activa. Clientes y préstamos se habilitan en las siguientes fases.
+        Tu cuenta está activa. Los préstamos se habilitan en las siguientes entregas.
       </p>
 
       <section aria-labelledby="caja" className="border-border mt-6 max-w-md rounded-lg border p-4">
@@ -32,6 +32,22 @@ export default async function NegocioPage() {
           {summary.hasOpeningBalance
             ? "Ver y registrar movimientos"
             : "Registrar saldo de apertura"}
+        </Link>
+      </section>
+
+      <section
+        aria-labelledby="clientes"
+        className="border-border mt-4 max-w-md rounded-lg border p-4"
+      >
+        <h2 id="clientes" className="text-lg font-medium">
+          Clientes
+        </h2>
+        <p className="text-muted mt-1 text-sm">Registra y consulta a quienes te piden prestado.</p>
+        <Link
+          href="/negocio/clientes"
+          className="bg-primary text-primary-foreground mt-3 inline-flex min-h-11 items-center rounded-lg px-4 font-medium"
+        >
+          Ver clientes
         </Link>
       </section>
     </>
