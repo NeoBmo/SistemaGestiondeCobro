@@ -30,6 +30,8 @@ export type LoanDetail = {
   interest: Money;
   total: Money;
   scheduledAmount: Money;
+  /** Importado: lo pagado antes de entrar al sistema (solo referencia); `null` en un préstamo nuevo. */
+  historicalPaid: Money | null;
   frequency: "DIARIA" | "SEMANAL" | "MENSUAL";
   installmentCount: number;
   disbursedOn: IsoDate;
@@ -59,6 +61,7 @@ type LoanRow = {
   interest_amount: string;
   total_amount: string;
   scheduled_amount: string;
+  historical_paid_amount: string | null;
   frequency: "DIARIA" | "SEMANAL" | "MENSUAL";
   installment_count: number;
   disbursed_on: string;
@@ -90,7 +93,7 @@ export async function getLoanDetail(
     `select l.id as loan_id, k.id as contract_id, k.number as contract_number, k.comment as contract_comment,
             l.status as loan_status, k.origin, c.id as client_id, c.name as client_name,
             l.principal_amount::text, l.interest_bps, l.interest_amount::text, l.total_amount::text,
-            l.scheduled_amount::text, l.frequency, l.installment_count, l.disbursed_on::text,
+            l.scheduled_amount::text, l.historical_paid_amount::text, l.frequency, l.installment_count, l.disbursed_on::text,
             l.first_due_on::text, l.created_at, k.voided_at, k.void_reason, b.time_zone
        from public.loans l
        join public.contracts k on k.id = l.contract_id
@@ -138,6 +141,7 @@ export async function getLoanDetail(
     interest: money(row.interest_amount),
     total: money(row.total_amount),
     scheduledAmount: money(row.scheduled_amount),
+    historicalPaid: row.historical_paid_amount === null ? null : money(row.historical_paid_amount),
     frequency: row.frequency,
     installmentCount: row.installment_count,
     disbursedOn: isoDate(row.disbursed_on),

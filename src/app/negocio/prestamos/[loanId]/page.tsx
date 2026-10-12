@@ -68,9 +68,19 @@ export default async function LoanPage({ params }: { params: Promise<{ loanId: s
             {FREQUENCY_LABEL[loan.frequency]} · {loan.installmentCount}{" "}
             {loan.installmentCount === 1 ? "cuota" : "cuotas"}
           </dd>
-          <dt className="text-muted">Desembolso</dt>
+          <dt className="text-muted">
+            {loan.origin === "IMPORTADO" ? "Fecha original" : "Desembolso"}
+          </dt>
           <dd>{formatIsoDate(loan.disbursedOn)}</dd>
-          <dt className="text-muted">Primera cuota</dt>
+          {loan.historicalPaid !== null ? (
+            <>
+              <dt className="text-muted">Pagado antes de importar</dt>
+              <dd className="font-mono tabular-nums">{formatMoney(loan.historicalPaid)}</dd>
+            </>
+          ) : null}
+          <dt className="text-muted">
+            {loan.origin === "IMPORTADO" ? "Próxima cuota al importar" : "Primera cuota"}
+          </dt>
           <dd>{formatIsoDate(loan.firstDueOn)}</dd>
         </dl>
       </section>

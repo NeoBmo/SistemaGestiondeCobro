@@ -57,3 +57,34 @@ export const annulContractSchema = z.object({
 });
 
 export const loanIdSchema = z.uuid();
+
+/**
+ * Préstamo de cartera previa (02 §6.1). `originalDate` es la fecha original del préstamo; `pendingBalance`
+ * lo que aún se debe; `installmentCount` las cuotas que faltan, desde `nextDueOn` (que puede ser pasada: así
+ * se representa la mora anterior). `historicalPaid` es solo referencia.
+ */
+export const importLoanTermsSchema = z.object({
+  clientId: z.uuid(),
+  originalDate: calendarDate,
+  principal: z.number().int().positive().max(MAX_PRINCIPAL),
+  interestBps: z.number().int().min(0).max(MAX_INTEREST_BPS),
+  frequency: z.enum(LOAN_FREQUENCIES),
+  historicalPaid: z
+    .number()
+    .int()
+    .min(0)
+    .max(MAX_PRINCIPAL * 100)
+    .optional(),
+  pendingBalance: z
+    .number()
+    .int()
+    .positive()
+    .max(MAX_PRINCIPAL * 100),
+  installmentCount: z.number().int().min(1).max(MAX_INSTALLMENTS),
+  nextDueOn: calendarDate,
+});
+
+export const importLoanSchema = importLoanTermsSchema.extend({ comment });
+
+export type ImportLoanTermsInput = z.output<typeof importLoanTermsSchema>;
+export type ImportLoanInput = z.output<typeof importLoanSchema>;
