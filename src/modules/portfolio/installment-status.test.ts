@@ -26,3 +26,18 @@ describe("estado derivado de una cuota", () => {
     expect(daysLate(day("2026-12-30"), day("2027-01-02"))).toBe(3);
   });
 });
+
+describe("estado con pagos parciales (02 §2.4)", () => {
+  it("con pago y saldo antes del vencimiento es PARCIAL; vencida con pago sigue VENCIDA", () => {
+    const partial = { dueOn: day("2026-10-14"), pendingAmount: 60, appliedAmount: 40 };
+    expect(deriveInstallmentStatus(partial, day("2026-10-13"))).toBe("PARCIAL");
+    expect(deriveInstallmentStatus(partial, day("2026-10-14"))).toBe("PARCIAL");
+    expect(deriveInstallmentStatus(partial, day("2026-10-15"))).toBe("VENCIDA");
+    expect(
+      deriveInstallmentStatus(
+        { ...partial, pendingAmount: 0, appliedAmount: 100 },
+        day("2026-10-15"),
+      ),
+    ).toBe("PAGADA");
+  });
+});

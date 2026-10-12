@@ -112,10 +112,6 @@ export default async function LoanPage({ params }: { params: Promise<{ loanId: s
               )}
             </dd>
           </dl>
-          <p className="text-muted mt-2 text-sm">
-            Los pagos se registran en la siguiente fase; por ahora el saldo es el calendario
-            completo.
-          </p>
         </section>
       )}
 
@@ -146,8 +142,15 @@ export default async function LoanPage({ params }: { params: Promise<{ loanId: s
               </span>
               <span className="font-mono tabular-nums">{formatMoney(installment.amount)}</span>
               <InstallmentBadge
-                status={voided ? "ANULADA" : installment.status}
+                status={
+                  voided
+                    ? "ANULADA"
+                    : loan.loanStatus === "REFINANCIADO"
+                      ? "REFINANCIADA"
+                      : installment.status
+                }
                 daysLate={installment.daysLate}
+                partial={installment.appliedAmount > 0}
               />
             </li>
           ))}
