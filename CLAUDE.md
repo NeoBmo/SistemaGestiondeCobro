@@ -4,6 +4,8 @@
 
 Plataforma web multi-negocio para negocios que prestan dinero y cobran cuotas mediante cobradores. Núcleo: trazabilidad financiera total — nada se edita ni se borra, todo se audita. Roles: Super Admin, Admin de negocio, Cobrador (aislados por `business_id`). Fuente de verdad de negocio → `docs/planning/02-DOMINIO.md`.
 
+> **Nota:** en la raíz hay un `AGENTS.md` con la guía operativa para cualquier agente (comandos, trampas de pruebas, cableado de herramientas, permisos). Este archivo conserva la autoridad y las reglas de negocio: ante cualquier contradicción, manda `CLAUDE.md`, y en negocio manda `docs/planning/02-DOMINIO.md`.
+
 ## Stack (pinnear exacto en package.json al iniciar F0)
 
 > Política: última versión compatible, exacta en `package.json` (resuelta con `npm view` en F0-T1, 2026-09-27). Desviaciones deliberadas: TypeScript 6.0.x porque `typescript-eslint` exige `<6.1` (TS 7 rompe el lint); ESLint 9 porque `eslint-plugin-react` (dentro de `eslint-config-next`) no funciona con ESLint 10 — revisar al actualizar `eslint-config-next`.
