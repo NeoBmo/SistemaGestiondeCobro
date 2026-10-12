@@ -81,6 +81,8 @@ Reglas de implementación:
 - **Concurrencia:** cada comando toma bloqueos explícitos dentro de la transacción — `SELECT … FOR UPDATE` sobre el préstamo y sus cuotas (pagos, reversos, refinanciación) y un bloqueo consultivo (`pg_advisory_xact_lock`) por negocio+caja para todo movimiento que dependa del saldo de Caja Mayor (desembolsos, fondos, liquidaciones), siempre en el mismo orden para evitar interbloqueos.
 - **Idempotencia:** tabla `idempotency_keys`, única por (`business_id`, comando, clave); guarda hash del payload y resultado. Misma clave y mismo hash → se devuelve el resultado guardado sin volver a ejecutar; misma clave y hash distinto → 409. La clave la genera el cliente por intento de usuario y se mantiene estable entre reintentos.
 - **Sistemas distintos:** crear un usuario en Supabase Auth y la transacción de BD no son atómicos entre sí. Orden obligatorio: crear en Auth → transacción de BD → si falla, compensar borrando el usuario de Auth.
+- **Ejecutor:** los comandos sobre Caja Mayor pasan por `runCashCommand` (`src/modules/cash/run-cash-command.ts`), que autoriza, abre la transacción, toma el bloqueo de la caja, aplica la idempotencia, exige y registra la auditoría y guarda el resultado; un comando solo aporta su `execute`.
+- **Ejecutor:** los comandos sobre Caja Mayor pasan por `runCashCommand` (`src/modules/cash/run-cash-command.ts`), que autoriza, abre la transacción, toma el bloqueo de la caja, aplica la idempotencia, exige y registra la auditoría y guarda el resultado; un comando solo aporta su `execute`.
 - Fechas en UTC; cada negocio muestra fecha/hora en su zona configurada.
 - Reversos y ajustes son eventos nuevos enlazados al original.
 - Las funciones que escriben dinero no usan caché.
