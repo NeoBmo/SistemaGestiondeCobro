@@ -4,15 +4,26 @@ import { notFound } from "next/navigation";
 import { getPageSession } from "@/modules/identity/page-session";
 import { getLoanDetail } from "@/modules/portfolio/loan-queries";
 import { getPool } from "@/shared/database/pg-pool";
-import { formatDateTimeInZone, formatIsoDate } from "@/shared/dates/dates";
+import { addDays, formatDateTimeInZone, formatIsoDate, localDateIn } from "@/shared/dates/dates";
 import { formatMoney } from "@/shared/money/money";
 import { CashFeedbackProvider } from "../../_components/cash-feedback";
 import { AnnulLoan } from "../_components/annul-loan";
 import { InstallmentBadge } from "../_components/installment-badge";
+import { LateFees } from "../_components/late-fees";
+import { PaymentHistory } from "../_components/payment-history";
+import { RefinanceLoan } from "../_components/refinance-loan";
+import { RegisterPayment } from "../_components/register-payment";
 
 export const metadata: Metadata = { title: "Préstamo" };
 
 const FREQUENCY_LABEL = { DIARIA: "Diaria", SEMANAL: "Semanal", MENSUAL: "Mensual" } as const;
+
+const STATUS_BADGE = {
+  ACTIVO: { icon: "✓", label: "Activo" },
+  PAGADO: { icon: "✓", label: "Pagado" },
+  REFINANCIADO: { icon: "↻", label: "Refinanciado" },
+  ANULADO: { icon: "▣", label: "Anulado" },
+} as const;
 
 /** 2000 → «20 %»; 1250 → «12,5 %». */
 const percent = (bps: number) => `${String(bps / 100).replace(".", ",")} %`;
@@ -25,6 +36,10 @@ export default async function LoanPage({ params }: { params: Promise<{ loanId: s
   const timeZone = session.businessTimeZone;
   if (!timeZone) throw new Error("El Admin de negocio no tiene zona horaria");
   const voided = loan.loanStatus === "ANULADO";
+  const active = loan.loanStatus === "ACTIVO";
+  const paid = loan.status === "PAGADO";
+  const tomorrow = addDays(localDateIn(new Date(), timeZone), 1);
+  const openFees = loan.lateFees.filter((fee) => fee.status === "ACTIVO" && fee.pendingAmount > 0);
 
   return (
     <CashFeedbackProvider>
@@ -34,8 +49,8 @@ export default async function LoanPage({ params }: { params: Promise<{ loanId: s
       <div className="mt-2 flex flex-wrap items-center gap-3">
         <h1 className="text-2xl font-semibold md:text-3xl">Contrato {loan.contractNumber}</h1>
         <span className="border-border bg-surface inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-sm font-medium">
-          <span aria-hidden="true">{voided ? "▣" : "✓"}</span>
-          {voided ? "Anulado" : "Confirmado"}
+          <span aria-hidden="true">{STATUS_BADGE[loan.status].icon}</span>
+          {STATUS_BADGE[loan.status].label}
         </span>
       </div>
       <p className="text-muted mt-1 text-sm">
@@ -46,6 +61,30 @@ export default async function LoanPage({ params }: { params: Promise<{ loanId: s
         <p className="mt-2 text-sm font-medium break-words">
           Anulado el {loan.voidedAt ? formatDateTimeInZone(loan.voidedAt, timeZone) : ""}. Motivo:{" "}
           {loan.voidReason}
+        </p>
+      ) : null}
+      {loan.refinancing.previousLoanId ? (
+        <p className="mt-2 text-sm">
+          Refinanciación del{" "}
+          <Link
+            href={`/negocio/prestamos/${loan.refinancing.previousLoanId}`}
+            className="text-primary underline"
+          >
+            préstamo anterior
+          </Link>
+          .
+        </p>
+      ) : null}
+      {loan.refinancing.nextLoanId ? (
+        <p className="mt-2 text-sm">
+          Su saldo pasó al{" "}
+          <Link
+            href={`/negocio/prestamos/${loan.refinancing.nextLoanId}`}
+            className="text-primary underline"
+          >
+            préstamo nuevo
+          </Link>
+          .
         </p>
       ) : null}
       {loan.contractComment ? (
@@ -100,6 +139,8 @@ export default async function LoanPage({ params }: { params: Promise<{ loanId: s
               {loan.overdueBalance > 0 ? <span aria-hidden="true">⚠ </span> : null}
               {formatMoney(loan.overdueBalance)}
             </dd>
+            <dt className="text-muted">Cargos de mora activos</dt>
+            <dd className="font-mono tabular-nums">{formatMoney(loan.lateFeeBalance)}</dd>
             <dt className="text-muted">Próxima cuota</dt>
             <dd>
               {loan.nextDue ? (
@@ -115,13 +156,39 @@ export default async function LoanPage({ params }: { params: Promise<{ loanId: s
         </section>
       )}
 
-      {voided ? null : (
+      {voided || !active ? null : (
         <section aria-labelledby="acciones" className="mt-8">
           <h2 id="acciones" className="text-xl font-semibold">
             Acciones
           </h2>
-          <div className="mt-3">
-            <AnnulLoan loanId={loan.loanId} contractNumber={loan.contractNumber} />
+          <div className="mt-3 flex flex-col gap-4">
+            {active && !paid ? (
+              <RegisterPayment
+                loanId={loan.loanId}
+                installments={loan.installments.map((i) => ({
+                  number: i.number,
+                  pendingAmount: i.pendingAmount,
+                }))}
+                lateFees={openFees.map((fee) => ({
+                  id: fee.id,
+                  reason: fee.reason,
+                  pendingAmount: fee.pendingAmount,
+                }))}
+              />
+            ) : null}
+            <div className="flex flex-wrap items-start gap-3">
+              {active && !paid ? (
+                <RefinanceLoan
+                  loanId={loan.loanId}
+                  contractNumber={loan.contractNumber}
+                  suggestedFirstDueOn={tomorrow}
+                  blockedByLateFees={loan.lateFeeBalance > 0}
+                />
+              ) : null}
+              {active ? (
+                <AnnulLoan loanId={loan.loanId} contractNumber={loan.contractNumber} />
+              ) : null}
+            </div>
           </div>
         </section>
       )}
@@ -140,7 +207,24 @@ export default async function LoanPage({ params }: { params: Promise<{ loanId: s
               <span className="font-medium">
                 Cuota {installment.number} · {formatIsoDate(installment.dueOn)}
               </span>
-              <span className="font-mono tabular-nums">{formatMoney(installment.amount)}</span>
+              <dl className="grid w-full grid-cols-3 gap-2 text-sm">
+                <div>
+                  <dt className="text-muted">Esperado</dt>
+                  <dd className="font-mono tabular-nums">{formatMoney(installment.amount)}</dd>
+                </div>
+                <div>
+                  <dt className="text-muted">Aplicado</dt>
+                  <dd className="font-mono tabular-nums">
+                    {formatMoney(installment.appliedAmount)}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-muted">Pendiente</dt>
+                  <dd className="font-mono tabular-nums">
+                    {formatMoney(installment.pendingAmount)}
+                  </dd>
+                </div>
+              </dl>
               <InstallmentBadge
                 status={
                   voided
@@ -156,6 +240,31 @@ export default async function LoanPage({ params }: { params: Promise<{ loanId: s
           ))}
         </ol>
       </section>
+
+      <PaymentHistory
+        timeZone={timeZone}
+        payments={loan.payments.map((payment) => ({
+          ...payment,
+          createdAt: payment.createdAt.toISOString(),
+          reversal: payment.reversal
+            ? { ...payment.reversal, createdAt: payment.reversal.createdAt.toISOString() }
+            : null,
+        }))}
+      />
+
+      <LateFees
+        loanId={loan.loanId}
+        canManage={active}
+        fees={loan.lateFees.map((fee) => ({
+          id: fee.id,
+          amount: fee.amount,
+          appliedAmount: fee.appliedAmount,
+          pendingAmount: fee.pendingAmount,
+          reason: fee.reason,
+          status: fee.status,
+          voidReason: fee.voidReason,
+        }))}
+      />
     </CashFeedbackProvider>
   );
 }
