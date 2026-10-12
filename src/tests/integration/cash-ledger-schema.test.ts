@@ -495,7 +495,7 @@ describe("RLS del libro", () => {
 
   it("el Super Admin activo sigue leyendo identidad (negocios, usuarios, suscripciones) con las políticas reescritas", async () => {
     await withRollback(pool, async (client) => {
-      const s = await seedWithData(client);
+      await seedWithData(client);
       const superAdmin = await createProfile(client, {
         role: "SUPER_ADMIN",
         businessId: null,
