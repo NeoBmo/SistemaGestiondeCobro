@@ -1,4 +1,4 @@
-import { addDays, addMonthsClamped, type IsoDate } from "@/shared/dates/dates";
+import { addDays, addMonthsClamped, isoDate, type IsoDate } from "@/shared/dates/dates";
 import { AppError } from "@/shared/errors/app-error";
 import { computeInterest, money, type Money } from "@/shared/money/money";
 
@@ -58,6 +58,8 @@ function dueDate(first: IsoDate, frequency: LoanFrequency, index: number): IsoDa
 }
 
 export function calculateLoan(terms: LoanTerms): LoanPlan {
+  // Un `IsoDate` mal formado o inexistente (30 de febrero) no se normaliza en silencio a otro día.
+  const firstDueOn = isoDate(terms.firstDueOn);
   if (!Number.isSafeInteger(terms.principal) || terms.principal <= 0) {
     throw invalid("INVALID_PRINCIPAL", "El monto prestado debe ser un entero mayor que cero");
   }
@@ -97,7 +99,7 @@ export function calculateLoan(terms: LoanTerms): LoanPlan {
     const isLast = index === count - 1;
     return {
       number: index + 1,
-      dueOn: dueDate(terms.firstDueOn, terms.frequency, index),
+      dueOn: dueDate(firstDueOn, terms.frequency, index),
       amount: money(isLast ? total - regular * (count - 1) : regular),
     };
   });

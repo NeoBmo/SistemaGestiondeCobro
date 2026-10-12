@@ -89,6 +89,27 @@ describe("cálculo del préstamo (02 §2.4)", () => {
       }
     }
   });
+  it("el piso se aplica aunque la fracción sea mayor que .5: 5 en 3 cuotas = [1, 1, 3]", () => {
+    const plan = calculateLoan(terms({ principal: 5, interestBps: 0, installmentCount: 3 }));
+    expect(plan.installments.map((installment) => installment.amount)).toEqual([1, 1, 3]);
+    const wide = calculateLoan(terms({ principal: 1999, interestBps: 0, installmentCount: 1000 }));
+    expect(wide.installments[0]!.amount).toBe(1);
+    expect(wide.installments.at(-1)!.amount).toBe(1000);
+  });
+
+  it("con los topes máximos juntos no desborda y la suma sigue siendo exacta", () => {
+    const plan = calculateLoan(
+      terms({
+        principal: MAX_PRINCIPAL,
+        interestBps: MAX_INTEREST_BPS,
+        installmentCount: MAX_INSTALLMENTS,
+        frequency: "DIARIA",
+      }),
+    );
+    expect(plan.interest).toBe(100_000_000_000_000);
+    expect(Number.isSafeInteger(plan.total)).toBe(true);
+    expect(sum(plan)).toBe(plan.total);
+  });
 });
 
 describe("calendario corrido (ADR 0007)", () => {
@@ -135,6 +156,39 @@ describe("calendario corrido (ADR 0007)", () => {
       ).installments[1]!.dueOn,
     ).toBe("2028-02-29");
   });
+
+  it("diaria cruza fin de mes y de año; mensual cruza diciembre y supera 12 cuotas", () => {
+    const daily = calculateLoan(
+      terms({ frequency: "DIARIA", installmentCount: 3, firstDueOn: isoDate("2026-12-30") }),
+    );
+    expect(daily.installments.map((installment) => installment.dueOn)).toEqual([
+      "2026-12-30",
+      "2026-12-31",
+      "2027-01-01",
+    ]);
+    const monthly = calculateLoan(
+      terms({ frequency: "MENSUAL", installmentCount: 14, firstDueOn: isoDate("2026-11-15") }),
+    );
+    expect(monthly.installments[1]!.dueOn).toBe("2026-12-15");
+    expect(monthly.installments[2]!.dueOn).toBe("2027-01-15");
+    expect(monthly.installments[13]!.dueOn).toBe("2027-12-15");
+  });
+
+  it("mensual con día 30 o 29 en febrero, año no bisiesto y partiendo de un 29 de febrero", () => {
+    const from30 = calculateLoan(
+      terms({ frequency: "MENSUAL", installmentCount: 3, firstDueOn: isoDate("2027-01-30") }),
+    );
+    expect(from30.installments.map((installment) => installment.dueOn)).toEqual([
+      "2027-01-30",
+      "2027-02-28",
+      "2027-03-30",
+    ]);
+    const fromLeapDay = calculateLoan(
+      terms({ frequency: "MENSUAL", installmentCount: 13, firstDueOn: isoDate("2028-02-29") }),
+    );
+    expect(fromLeapDay.installments[1]!.dueOn).toBe("2028-03-29");
+    expect(fromLeapDay.installments[12]!.dueOn).toBe("2029-02-28");
+  });
 });
 
 describe("validación de las condiciones", () => {
@@ -152,6 +206,7 @@ describe("validación de las condiciones", () => {
       expect(codeOf({ principal }), String(principal)).toBe("INVALID_PRINCIPAL");
     }
     expect(codeOf({ principal: MAX_PRINCIPAL })).toBe("sin error");
+    expect(codeOf({ interestBps: MAX_INTEREST_BPS })).toBe("sin error");
   });
 
   it("rechaza interés negativo, decimal o fuera de tope", () => {
@@ -168,6 +223,10 @@ describe("validación de las condiciones", () => {
       );
     }
     expect(codeOf({ installmentCount: MAX_INSTALLMENTS })).toBe("sin error");
+  });
+
+  it("una fecha de primera cuota inválida se rechaza con un AppError", () => {
+    expect(() => calculateLoan(terms({ firstDueOn: "2026-02-30" as never }))).toThrow(AppError);
   });
 
   it("rechaza más cuotas que pesos por pagar (cuotas de cero)", () => {

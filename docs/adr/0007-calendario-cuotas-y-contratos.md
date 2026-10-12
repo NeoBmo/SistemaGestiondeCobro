@@ -15,6 +15,10 @@ F3 genera el calendario de cuotas y registra clientes y contratos. `02` fija el 
 - **Un solo paso con vista previa.** La pantalla pide al servidor una vista previa (principal, interés, total, cuotas y fechas) que no guarda nada; al confirmar se crean, en una sola transacción, el contrato `CONFIRMADO` con su número, el préstamo, las cuotas y el desembolso de Caja Mayor. El estado `BORRADOR` sigue definido en el dominio pero **no se construye** en V1 (no hay tabla de condiciones editables ni descarte de borradores).
 - **Identificación única por negocio.** Dos clientes del mismo negocio no comparten identificación; el mismo documento sí puede existir en otro negocio. Lo impone un índice único `(business_id, identification)`.
 
+## Límites técnicos (no son reglas de negocio)
+
+Para mantener los importes dentro de los enteros seguros (regla 8) y evitar calendarios absurdos: principal ≤ 10¹² pesos, interés ≤ 1.000.000 bps (10.000 %), entre 1 y 1.000 cuotas, y no más cuotas que pesos por pagar (una cuota nunca vale cero). Con el piso, la última cuota puede superar a las demás hasta en n−1 pesos (p. ej. total 1.999 en 1.000 cuotas: 999 de $1 y una de $1.000); es una consecuencia de la regla elegida y el dueño puede acotarla si lo desea.
+
 ## Consecuencias
 
 - El cálculo del calendario es una función pura sin acceso a la base de datos, probada con los ejemplos de `02` (1.000.000 al 20 % en 12 cuotas) y con totales que no se dividen exactos.
