@@ -32,9 +32,17 @@ export default async function ClientPage({ params }: { params: Promise<{ clientI
       {client.nickname ? <p className="text-muted text-sm">«{client.nickname}»</p> : null}
 
       <section aria-labelledby="prestamos" className="mt-6">
-        <h2 id="prestamos" className="text-xl font-semibold">
-          Préstamos
-        </h2>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 id="prestamos" className="text-xl font-semibold">
+            Préstamos
+          </h2>
+          <Link
+            href={`/negocio/prestamos/nuevo?cliente=${client.id}`}
+            className="bg-primary text-primary-foreground inline-flex min-h-11 items-center rounded-lg px-4 font-medium"
+          >
+            Nuevo préstamo
+          </Link>
+        </div>
         {loans.length === 0 ? (
           <div className="border-border mt-3 rounded-lg border border-dashed p-6 text-center">
             <p className="font-medium">Este cliente aún no tiene préstamos.</p>
@@ -44,7 +52,12 @@ export default async function ClientPage({ params }: { params: Promise<{ clientI
             {loans.map((loan) => (
               <li key={loan.loanId} className="border-border rounded-lg border p-3">
                 <p className="font-medium">
-                  Contrato {loan.contractNumber}
+                  <Link
+                    href={`/negocio/prestamos/${loan.loanId}`}
+                    className="text-primary underline"
+                  >
+                    Contrato {loan.contractNumber}
+                  </Link>
                   {loan.status === "ANULADO" ? " · Anulado" : ""}
                 </p>
                 <p className="text-sm">

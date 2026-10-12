@@ -97,3 +97,62 @@ test("un cobrador no entra a los clientes y un cliente de otro negocio da «no e
     page.getByRole("heading", { level: 1, name: "Cliente no encontrado" }),
   ).toBeVisible();
 });
+
+test("el Admin calcula, confirma un préstamo y ve su calendario; la caja baja una sola vez", async ({
+  page,
+}) => {
+  const businessId = await fixtures.business("Negocio préstamo E2E");
+  const admin = await fixtures.account({ role: "ADMIN_NEGOCIO", businessId });
+  await pool.query(
+    `insert into public.cash_movements (business_id, cashbox_id, type, direction, amount, created_by)
+     select $1, id, 'INGRESO_CAPITAL', 'ENTRADA', 2000000, $2 from public.main_cashboxes where business_id = $1`,
+    [businessId, admin.userId],
+  );
+  const client = await pool.query<{ id: string }>(
+    "insert into public.clients (business_id, name, identification, created_by) values ($1, 'Luis Prestatario', $2, $3) returning id",
+    [businessId, randomUUID().slice(0, 8), admin.userId],
+  );
+
+  await login(page, admin.username, admin.password);
+  await page.goto(`/negocio/clientes/${client.rows[0]!.id}`);
+  await page.getByRole("link", { name: "Nuevo préstamo" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Nuevo préstamo" })).toBeVisible();
+
+  // Validación en el cliente: un monto inválido no calcula nada.
+  await page.getByLabel(/^Monto a prestar/).fill("12,5");
+  await page.getByRole("button", { name: "Calcular" }).click();
+  await expect(page.getByText(/pesos enteros/).first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Vista previa" })).toHaveCount(0);
+
+  // Vista previa del ejemplo del dominio: $1.000.000 al 20 % en 12 cuotas diarias de $100.000.
+  await page.getByLabel(/^Monto a prestar/).fill("1000000");
+  await page.getByRole("button", { name: "Calcular" }).click();
+  await expect(page.getByRole("heading", { name: "Vista previa" })).toBeVisible();
+  await expect(page.getByText("$1.200.000")).toBeVisible();
+  await expect(page.getByText(/12 de/)).toContainText("$100.000");
+
+  // Cambiar una condición descarta la vista previa: no se confirma algo que no se calculó.
+  await page.getByLabel(/^Número de cuotas/).fill("6");
+  await expect(page.getByRole("heading", { name: "Vista previa" })).toHaveCount(0);
+  await page.getByLabel(/^Número de cuotas/).fill("12");
+  await page.getByRole("button", { name: "Calcular" }).click();
+  await page.getByRole("button", { name: "Confirmar préstamo y desembolsar" }).click();
+
+  await expect(page.getByRole("heading", { level: 1, name: /Contrato CT-000001/ })).toBeVisible();
+  await expect(
+    page.getByText("Saldo pendiente").locator("xpath=following-sibling::dd[1]"),
+  ).toHaveText("$1.200.000");
+  await expect(page.getByTestId("cuota")).toHaveCount(12);
+
+  // La Caja Mayor bajó exactamente el monto prestado, una sola vez.
+  await page.goto("/negocio/caja");
+  await expect(page.getByTestId("saldo")).toHaveText("$1.000.000");
+  await expect(page.getByText("Desembolso de préstamo")).toBeVisible();
+
+  // Mobile-first: sin desbordes en el detalle del préstamo.
+  await page.goBack();
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  );
+  expect(overflow).toBeLessThanOrEqual(0);
+});
