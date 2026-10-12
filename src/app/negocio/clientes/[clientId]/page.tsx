@@ -42,6 +42,12 @@ export default async function ClientPage({ params }: { params: Promise<{ clientI
           >
             Nuevo préstamo
           </Link>
+          <Link
+            href={`/negocio/prestamos/importar?cliente=${client.id}`}
+            className="border-border bg-background hover:bg-surface inline-flex min-h-11 items-center rounded-lg border px-4 font-medium"
+          >
+            Importar préstamo anterior
+          </Link>
         </div>
         {loans.length === 0 ? (
           <div className="border-border mt-3 rounded-lg border border-dashed p-6 text-center">

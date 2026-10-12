@@ -57,7 +57,7 @@ function dueDate(first: IsoDate, frequency: LoanFrequency, index: number): IsoDa
   }
 }
 
-export function calculateLoan(terms: LoanTerms): LoanPlan {
+function assertTerms(terms: LoanTerms): IsoDate {
   // Un `IsoDate` mal formado o inexistente (30 de febrero) no se normaliza en silencio a otro día.
   const firstDueOn = isoDate(terms.firstDueOn);
   if (!Number.isSafeInteger(terms.principal) || terms.principal <= 0) {
@@ -85,24 +85,86 @@ export function calculateLoan(terms: LoanTerms): LoanPlan {
       `La cantidad de cuotas debe estar entre 1 y ${MAX_INSTALLMENTS}`,
     );
   }
+  return firstDueOn;
+}
 
-  const principal = money(terms.principal);
-  const interest = computeInterest(principal, terms.interestBps);
-  const total = money(principal + interest);
-  if (total < count) {
+/**
+ * Reparte `amount` en `count` cuotas (ADR 0007): las cuotas 1..n−1 valen piso(amount / n) y la última
+ * absorbe el resto, así la suma es exactamente `amount`. Las fechas salen de la primera, en calendario corrido.
+ */
+function buildSchedule(
+  amount: Money,
+  count: number,
+  frequency: LoanFrequency,
+  firstDueOn: IsoDate,
+): PlannedInstallment[] {
+  if (amount < count) {
     throw invalid("INSTALLMENTS_EXCEED_TOTAL", "Hay más cuotas que pesos por pagar");
   }
-
-  // Cuotas 1..n−1 = piso(total / n); la última absorbe el resto, así la suma es exactamente el total.
-  const regular = Math.floor(total / count);
-  const installments: PlannedInstallment[] = Array.from({ length: count }, (_, index) => {
+  const regular = Math.floor(amount / count);
+  return Array.from({ length: count }, (_, index) => {
     const isLast = index === count - 1;
     return {
       number: index + 1,
-      dueOn: dueDate(firstDueOn, terms.frequency, index),
-      amount: money(isLast ? total - regular * (count - 1) : regular),
+      dueOn: dueDate(firstDueOn, frequency, index),
+      amount: money(isLast ? amount - regular * (count - 1) : regular),
     };
   });
+}
 
-  return { principal, interest, total, installments };
+export function calculateLoan(terms: LoanTerms): LoanPlan {
+  const firstDueOn = assertTerms(terms);
+  const principal = money(terms.principal);
+  const interest = computeInterest(principal, terms.interestBps);
+  const total = money(principal + interest);
+  return {
+    principal,
+    interest,
+    total,
+    installments: buildSchedule(total, terms.installmentCount, terms.frequency, firstDueOn),
+  };
+}
+
+export type ImportedLoanTerms = LoanTerms & {
+  /** Saldo que aún se debe al importar (02 §6.1): es lo que suman las cuotas que faltan. */
+  pendingBalance: number;
+};
+
+export type ImportedLoanPlan = LoanPlan & {
+  /** Suma de las cuotas que faltan: el saldo inicial pendiente. */
+  scheduled: Money;
+};
+
+/**
+ * Préstamo importado (02 §6.1, ADR 0007): el interés y el total se calculan como en uno nuevo (principal
+ * original y porcentaje pactado), pero el calendario guarda **solo las cuotas que faltan**: el saldo
+ * pendiente repartido en `installmentCount` cuotas desde la próxima fecha de cobro. Lo ya pagado queda
+ * como dato de referencia y no genera cuotas ni pagos.
+ */
+export function calculateImportedLoan(terms: ImportedLoanTerms): ImportedLoanPlan {
+  const nextDueOn = assertTerms(terms);
+  const principal = money(terms.principal);
+  const interest = computeInterest(principal, terms.interestBps);
+  const total = money(principal + interest);
+
+  if (!Number.isSafeInteger(terms.pendingBalance) || terms.pendingBalance <= 0) {
+    throw invalid(
+      "INVALID_PENDING_BALANCE",
+      "El saldo pendiente debe ser un entero mayor que cero",
+    );
+  }
+  if (terms.pendingBalance > total) {
+    throw invalid(
+      "PENDING_EXCEEDS_TOTAL",
+      "El saldo pendiente no puede ser mayor que el total pactado del préstamo",
+    );
+  }
+  const scheduled = money(terms.pendingBalance);
+  return {
+    principal,
+    interest,
+    total,
+    scheduled,
+    installments: buildSchedule(scheduled, terms.installmentCount, terms.frequency, nextDueOn),
+  };
 }

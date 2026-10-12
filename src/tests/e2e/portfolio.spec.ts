@@ -170,3 +170,52 @@ test("el Admin calcula, confirma un préstamo y ve su calendario; la caja baja u
   );
   expect(overflow).toBeLessThanOrEqual(0);
 });
+
+test("el Admin importa un préstamo anterior: sin pagos ni cambios en la caja, con cuotas vencidas", async ({
+  page,
+}) => {
+  const businessId = await fixtures.business("Negocio importación E2E");
+  const admin = await fixtures.account({ role: "ADMIN_NEGOCIO", businessId });
+  const client = await pool.query<{ id: string }>(
+    "insert into public.clients (business_id, name, identification, created_by) values ($1, 'Rosa Antigua', $2, $3) returning id",
+    [businessId, randomUUID().slice(0, 8), admin.userId],
+  );
+
+  await login(page, admin.username, admin.password);
+  await page.goto(`/negocio/clientes/${client.rows[0]!.id}`);
+  await page.getByRole("link", { name: "Importar préstamo anterior" }).click();
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Importar préstamo anterior" }),
+  ).toBeVisible();
+
+  // Fechas relativas a hoy: el préstamo empezó hace 60 días y la próxima cuota venció hace 3.
+  const day = (offset: number) => {
+    // Hoy en la zona del negocio (Bogotá, UTC−5): se evita el cambio de día de UTC.
+    const d = new Date(Date.now() - 5 * 3_600_000 + offset * 86_400_000);
+    return d.toISOString().slice(0, 10);
+  };
+  await page.getByLabel("Fecha original del préstamo").fill(day(-60));
+  await page.getByLabel(/^Monto prestado originalmente/).fill("1000000");
+  await page.getByLabel("Frecuencia de cobro").selectOption("DIARIA");
+  await page.getByLabel(/^Ya pagado antes de importar/).fill("500000");
+  await page.getByLabel(/^Saldo pendiente hoy/).fill("700000");
+  await page.getByLabel(/^Cuotas que faltan/).fill("7");
+  await page.getByLabel("Próxima fecha de cobro").fill(day(-3));
+  await page.getByRole("button", { name: "Calcular" }).click();
+
+  await expect(page.getByRole("heading", { name: "Vista previa" })).toBeVisible();
+  await expect(page.getByText("cuota(s) ya vencida(s)")).toBeVisible();
+  await expect(page.getByText("Los datos históricos no cuadran")).toHaveCount(0);
+  await page.getByRole("button", { name: "Importar préstamo" }).click();
+
+  await expect(page.getByRole("heading", { level: 1, name: /Contrato CT-000001/ })).toBeVisible();
+  await expect(page.getByText("Cartera importada")).toBeVisible();
+  await expect(page.getByText("Pagado antes de importar")).toBeVisible();
+  await expect(page.getByTestId("cuota")).toHaveCount(7);
+  await expect(page.getByText("Vencida").first()).toBeVisible();
+
+  // Importar no mueve la Caja Mayor.
+  await page.goto("/negocio/caja");
+  await expect(page.getByTestId("saldo")).toHaveText("$0");
+  await expect(page.getByText("Aún no hay movimientos.")).toBeVisible();
+});

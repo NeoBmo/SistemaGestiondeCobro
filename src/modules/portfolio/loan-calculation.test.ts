@@ -5,7 +5,9 @@ import {
   MAX_INSTALLMENTS,
   MAX_INTEREST_BPS,
   MAX_PRINCIPAL,
+  calculateImportedLoan,
   calculateLoan,
+  type ImportedLoanTerms,
   type LoanTerms,
 } from "./loan-calculation";
 
@@ -234,5 +236,67 @@ describe("validación de las condiciones", () => {
       "INSTALLMENTS_EXCEED_TOTAL",
     );
     expect(codeOf({ principal: 6, interestBps: 0, installmentCount: 6 })).toBe("sin error");
+  });
+});
+
+describe("préstamo importado (02 §6.1, ADR 0007)", () => {
+  const imported = (overrides: Partial<ImportedLoanTerms> = {}): ImportedLoanTerms => ({
+    ...terms(),
+    pendingBalance: 600_000,
+    installmentCount: 6,
+    firstDueOn: isoDate("2026-10-20"),
+    ...overrides,
+  });
+
+  it("calcula interés y total como un préstamo nuevo y guarda solo las cuotas que faltan, que suman el saldo", () => {
+    const plan = calculateImportedLoan(imported());
+
+    expect(plan).toMatchObject({
+      principal: 1_000_000,
+      interest: 200_000,
+      total: 1_200_000,
+      scheduled: 600_000,
+    });
+    expect(plan.installments).toHaveLength(6);
+    expect(plan.installments.every((i) => i.amount === 100_000)).toBe(true);
+    expect(plan.installments[0]).toEqual({ number: 1, dueOn: "2026-10-20", amount: 100_000 });
+    expect(sum(plan)).toBe(600_000);
+  });
+
+  it("reparte con piso y resto en la última, igual que un préstamo nuevo", () => {
+    const plan = calculateImportedLoan(
+      imported({ pendingBalance: 1_000_000, installmentCount: 3 }),
+    );
+    expect(plan.installments.map((i) => i.amount)).toEqual([333_333, 333_333, 333_334]);
+  });
+
+  it("acepta un saldo igual al total, y rechaza un saldo mayor que el total, cero o con decimales", () => {
+    expect(calculateImportedLoan(imported({ pendingBalance: 1_200_000 })).scheduled).toBe(
+      1_200_000,
+    );
+    for (const [pendingBalance, code] of [
+      [1_200_001, "PENDING_EXCEEDS_TOTAL"],
+      [0, "INVALID_PENDING_BALANCE"],
+      [-5, "INVALID_PENDING_BALANCE"],
+      [10.5, "INVALID_PENDING_BALANCE"],
+      [5, "INSTALLMENTS_EXCEED_TOTAL"],
+    ] as const) {
+      expect(
+        () => calculateImportedLoan(imported({ pendingBalance })),
+        String(pendingBalance),
+      ).toThrow(expect.objectContaining({ code }));
+    }
+  });
+
+  it("una próxima fecha de cobro pasada es válida (representa mora anterior) y las demás validaciones aplican", () => {
+    const plan = calculateImportedLoan(
+      imported({ firstDueOn: isoDate("2020-01-15"), frequency: "MENSUAL" }),
+    );
+    expect(plan.installments[0]!.dueOn).toBe("2020-01-15");
+    expect(plan.installments[5]!.dueOn).toBe("2020-06-15");
+    expect(() => calculateImportedLoan(imported({ installmentCount: 0 }))).toThrow(AppError);
+    expect(() => calculateImportedLoan(imported({ firstDueOn: "2026-02-30" as never }))).toThrow(
+      AppError,
+    );
   });
 });
