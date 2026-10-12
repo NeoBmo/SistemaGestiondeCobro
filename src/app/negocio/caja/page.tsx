@@ -12,7 +12,7 @@ import { getPool } from "@/shared/database/pg-pool";
 import { formatDateTimeInZone } from "@/shared/dates/dates";
 import { formatMoney } from "@/shared/money/money";
 import { CashActions } from "./_components/cash-actions";
-import { CashFeedbackProvider } from "./_components/cash-feedback";
+import { CashFeedbackProvider } from "../_components/cash-feedback";
 import { ReverseMovement } from "./_components/reverse-movement";
 
 export const metadata: Metadata = { title: "Caja Mayor" };

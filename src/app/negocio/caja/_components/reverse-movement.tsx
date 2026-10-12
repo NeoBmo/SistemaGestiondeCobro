@@ -8,7 +8,7 @@ import { Button } from "@/shared/ui/button";
 import { createIdempotencyKeyHolder } from "@/shared/ui/idempotency-key";
 import { TextAreaField } from "@/shared/ui/text-area-field";
 import { useCommand } from "@/shared/ui/use-command";
-import { useCashFeedback } from "./cash-feedback";
+import { useCashFeedback } from "../../_components/cash-feedback";
 
 type Props = { movementId: string; label: string };
 

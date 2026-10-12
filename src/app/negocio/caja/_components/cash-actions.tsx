@@ -13,7 +13,7 @@ import { SelectField } from "@/shared/ui/select-field";
 import { TextAreaField } from "@/shared/ui/text-area-field";
 import { TextField } from "@/shared/ui/text-field";
 import { useCommand } from "@/shared/ui/use-command";
-import { useCashFeedback } from "./cash-feedback";
+import { useCashFeedback } from "../../_components/cash-feedback";
 
 type MovementResult = { movementId: string; balance: number; replayed: boolean };
 

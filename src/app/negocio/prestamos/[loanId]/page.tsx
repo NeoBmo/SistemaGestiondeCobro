@@ -6,6 +6,8 @@ import { getLoanDetail } from "@/modules/portfolio/loan-queries";
 import { getPool } from "@/shared/database/pg-pool";
 import { formatDateTimeInZone, formatIsoDate } from "@/shared/dates/dates";
 import { formatMoney } from "@/shared/money/money";
+import { CashFeedbackProvider } from "../../_components/cash-feedback";
+import { AnnulLoan } from "../_components/annul-loan";
 import { InstallmentBadge } from "../_components/installment-badge";
 
 export const metadata: Metadata = { title: "Préstamo" };
@@ -25,7 +27,7 @@ export default async function LoanPage({ params }: { params: Promise<{ loanId: s
   const voided = loan.loanStatus === "ANULADO";
 
   return (
-    <>
+    <CashFeedbackProvider>
       <Link href={`/negocio/clientes/${loan.client.id}`} className="text-primary text-sm underline">
         ← {loan.client.name}
       </Link>
@@ -107,6 +109,17 @@ export default async function LoanPage({ params }: { params: Promise<{ loanId: s
         </section>
       )}
 
+      {voided ? null : (
+        <section aria-labelledby="acciones" className="mt-8">
+          <h2 id="acciones" className="text-xl font-semibold">
+            Acciones
+          </h2>
+          <div className="mt-3">
+            <AnnulLoan loanId={loan.loanId} contractNumber={loan.contractNumber} />
+          </div>
+        </section>
+      )}
+
       <section aria-labelledby="calendario" className="mt-8">
         <h2 id="calendario" className="text-xl font-semibold">
           Calendario de cuotas
@@ -130,6 +143,6 @@ export default async function LoanPage({ params }: { params: Promise<{ loanId: s
           ))}
         </ol>
       </section>
-    </>
+    </CashFeedbackProvider>
   );
 }

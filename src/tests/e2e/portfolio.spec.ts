@@ -149,6 +149,20 @@ test("el Admin calcula, confirma un préstamo y ve su calendario; la caja baja u
   await expect(page.getByTestId("saldo")).toHaveText("$1.000.000");
   await expect(page.getByText("Desembolso de préstamo")).toBeVisible();
 
+  // Anular exige motivo y confirmación, devuelve el desembolso y deja el préstamo sin deuda.
+  await page.goBack();
+  await page.getByRole("button", { name: "Anular contrato" }).click();
+  await page.getByRole("button", { name: "Confirmar anulación" }).click();
+  await expect(page.getByText("Escribe el motivo de la anulación.")).toBeVisible();
+  await page.getByLabel("Motivo de la anulación").fill("El cliente se arrepintió");
+  await page.getByRole("button", { name: "Confirmar anulación" }).click();
+  await expect(page.getByText(/Contrato CT-000001 anulado. El desembolso volvió/)).toBeVisible();
+  await expect(page.getByText(/Motivo: El cliente se arrepintió/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Anular contrato" })).toHaveCount(0);
+  await expect(page.getByText("Anulada").first()).toBeVisible();
+  await page.goto("/negocio/caja");
+  await expect(page.getByTestId("saldo")).toHaveText("$2.000.000");
+
   // Mobile-first: sin desbordes en el detalle del préstamo.
   await page.goBack();
   const overflow = await page.evaluate(
