@@ -1,7 +1,7 @@
 import type { Pool } from "pg";
 import { recordAuditEvent, type AuditEventInput } from "@/modules/audit/record-audit-event";
-import { recordRejectedAttempt } from "@/modules/audit/record-rejection";
-import { authorizeSession, type SessionContext } from "@/modules/identity/session";
+import { authorizeBusinessAdmin } from "@/modules/identity/authorize-business-admin";
+import type { SessionContext } from "@/modules/identity/session";
 import { payloadHash } from "@/shared/commands/canonical-json";
 import { setLockTimeout, translateLockTimeout } from "@/shared/database/lock-timeout";
 import { withTransaction, type Tx } from "@/shared/database/with-transaction";
@@ -167,40 +167,11 @@ async function replay<R>(
   return { result: stored.result, replayed: true };
 }
 
-/**
- * Solo el Admin de negocio, con la contraseña temporal ya cambiada. Devuelve el negocio de la sesión.
- * Los Route Handlers lo llaman **antes** de validar la entrada (un actor sin permiso recibe 403, nunca un 400
- * que le detalle el formato esperado); el ejecutor lo vuelve a aplicar.
- * Un cobrador (autenticado, con negocio) que lo intenta deja un evento `RECHAZADO` sobre la caja de su
- * negocio; el Super Admin no tiene negocio ni caja y recibe el 403 sin evento (ADR 0005).
- */
-export async function authorizeCashActor(
+/** Ver `authorizeBusinessAdmin`: los comandos de caja los ejecuta solo el Admin de negocio. */
+export function authorizeCashActor(
   deps: RunCashCommandDeps,
   actor: SessionContext,
   commandName: string,
 ): Promise<string> {
-  try {
-    authorizeSession(actor, { roles: ["ADMIN_NEGOCIO"] });
-  } catch (error) {
-    if (actor.businessId && (error as { code?: string }).code === "FORBIDDEN") {
-      const businessId = actor.businessId;
-      await recordRejectedAttempt(
-        deps.db,
-        {
-          actor,
-          businessId,
-          // Aquí la acción rechazada es el nombre del comando (no el evento que habría generado).
-          action: commandName,
-          entityType: "business",
-          entityId: businessId,
-        },
-        async () => true,
-      );
-    }
-    throw error;
-  }
-  if (!actor.businessId) {
-    throw new AppError("FORBIDDEN", "No tienes permiso para esta operación", 403);
-  }
-  return actor.businessId;
+  return authorizeBusinessAdmin(deps.db, actor, commandName);
 }
