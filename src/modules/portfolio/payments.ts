@@ -37,7 +37,7 @@ export async function lockLoan(tx: Tx, businessId: string, loanId: string): Prom
 
 export function assertLoanActive(
   loan: LoanRow,
-  action: "pagos" | "reversos" | "cargos de mora" = "pagos",
+  action: "pagos" | "reversos" | "cargos de mora" | "refinanciaciones" = "pagos",
 ): void {
   if (loan.status !== "ACTIVO") {
     const why = loan.status === "REFINANCIADO" ? "fue refinanciado" : "está anulado";
@@ -47,7 +47,10 @@ export function assertLoanActive(
 
 type PendingInstallment = { id: string; number: number; amount: number; applied: number };
 
-async function installmentsWithApplied(tx: Tx, loanId: string): Promise<PendingInstallment[]> {
+export async function installmentsWithApplied(
+  tx: Tx,
+  loanId: string,
+): Promise<PendingInstallment[]> {
   const { rows } = await tx.query<{ id: string; number: number; amount: string; applied: string }>(
     `select i.id, i.number, i.amount::text, private.installment_applied(i.id)::text as applied
        from public.installments i where i.loan_id = $1 order by i.number`,
@@ -62,7 +65,7 @@ async function installmentsWithApplied(tx: Tx, loanId: string): Promise<PendingI
 }
 
 /** Cargos de mora no anulados con saldo pendiente (02 §3.4): un préstamo no está pagado con alguno. */
-async function activeChargeBalance(tx: Tx, loanId: string): Promise<number> {
+export async function activeChargeBalance(tx: Tx, loanId: string): Promise<number> {
   const { rows } = await tx.query<{ balance: string }>(
     `select coalesce(sum(c.amount - private.charge_applied(c.id)), 0)::text as balance
        from public.late_fee_charges c

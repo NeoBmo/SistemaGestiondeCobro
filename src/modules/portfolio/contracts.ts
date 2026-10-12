@@ -50,7 +50,7 @@ function businessTimeZone(actor: SessionContext): string {
 }
 
 /** El primer cobro no puede ser anterior al desembolso (también lo exige la base de datos). */
-function assertFirstDueNotBeforeDisbursement(firstDueOn: IsoDate, disbursedOn: IsoDate) {
+export function assertFirstDueNotBeforeDisbursement(firstDueOn: IsoDate, disbursedOn: IsoDate) {
   if (firstDueOn < disbursedOn) {
     throw new AppError(
       "FIRST_DUE_BEFORE_DISBURSEMENT",
@@ -304,8 +304,9 @@ export function annulContract(
         contract_id: string;
         number: string;
         status: "ACTIVO" | "ANULADO" | "REFINANCIADO";
+        previous_loan_id: string | null;
       }>(
-        `select k.id as contract_id, k.number, l.status
+        `select k.id as contract_id, k.number, l.status, l.previous_loan_id
            from public.loans l join public.contracts k on k.id = l.contract_id
           where l.id = $1 and l.business_id = $2
           for update of l, k`,
@@ -322,6 +323,16 @@ export function annulContract(
       }
       if (loan.status !== "ACTIVO") {
         throw new AppError("CONTRACT_ALREADY_VOIDED", "Este contrato ya está anulado", 409);
+      }
+
+      // El préstamo que nace de una refinanciación no se anula: dejaría al cliente sin deuda en ningún
+      // préstamo (el anterior sigue REFINANCIADO). Qué hacer en ese caso está pendiente (05-PENDIENTES).
+      if (loan.previous_loan_id) {
+        throw new AppError(
+          "LOAN_FROM_REFINANCING",
+          "Este préstamo nació de una refinanciación y no puede anularse",
+          409,
+        );
       }
 
       // Con pagos vigentes no se anula (02 §2.2, ADR 0008): primero se reversan (la base también lo exige).
