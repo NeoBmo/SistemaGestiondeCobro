@@ -265,10 +265,11 @@ describe("refinanciar", () => {
     // Contrato nuevo creado y confirmado (el del préstamo anterior también tiene los suyos).
     expect(actions.filter((a) => a === "ContratoCreado").length).toBeGreaterThanOrEqual(2);
     expect(actions.filter((a) => a === "ContratoConfirmado").length).toBeGreaterThanOrEqual(2);
-    expect(events.rows.find((e) => e.action === "PrestamoRefinanciado")!.entity_id).toBe(s.loanId);
-    expect(events.rows.find((e) => e.action === "PrestamoCreado")!.entity_id).toBe(
-      outcome.result.newLoanId,
-    );
+    const has = (action: string, entityId: string) =>
+      events.rows.some((e) => e.action === action && e.entity_id === entityId);
+    expect(has("PrestamoRefinanciado", s.loanId)).toBe(true);
+    expect(has("SaldoAnteriorRefinanciado", s.loanId)).toBe(true);
+    expect(has("PrestamoCreado", outcome.result.newLoanId)).toBe(true);
   });
 
   it("si la caja no alcanza para el adicional se rechaza sin dejar nada", async () => {
