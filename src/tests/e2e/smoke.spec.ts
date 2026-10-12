@@ -9,7 +9,14 @@ const publicPages = [
   { path: "/login", heading: "Iniciar sesión" },
 ];
 
-const privatePages = ["/super-admin", "/negocio", "/cobrador", "/cambiar-contrasena"];
+const privatePages = [
+  "/super-admin",
+  "/super-admin/negocios/nuevo",
+  "/super-admin/negocios/00000000-0000-0000-0000-000000000000",
+  "/negocio",
+  "/cobrador",
+  "/cambiar-contrasena",
+];
 
 for (const { path, heading } of publicPages) {
   test(`${path} responde 200 con su título y un único landmark main`, async ({ page }) => {
