@@ -7,14 +7,13 @@ La mayoría de las decisiones de V1 ya están cerradas y viven en `02-DOMINIO.md
 ## Abierto
 
 - **Precios monetarios reales de los planes** (semanal/mensual/anual): se usan cifras de ejemplo (placeholder) solo para desarrollo — no bloquean F1, pero **no deben pasar a producción** sin reemplazarse por las cifras reales. El campo de precio queda modelado como configurable desde el inicio, precisamente para no tener que tocar esquema cuando llegue el número real.
-- **Redacción legal de términos y condiciones, política de protección de datos y conservación.** No bloquea F1–F2 (F1 solo registra fecha/hora de aceptación). La política de protección de datos personales debe resolverse antes de F3 (primera PII); los términos y condiciones, antes de operar con datos reales (F8).
+- **Redacción legal de términos y condiciones, política de protección de datos y conservación.** No bloquea F1–F2 (F1 solo registra fecha/hora de aceptación). El dueño confirmó el 2026-10-12 haber cumplido el gate previo a F3 (revisión de 02 con un operador real y política de datos personales); **la política escrita no está en el repositorio** — debe incorporarse a `docs/` cuando exista. Los términos y condiciones, antes de operar con datos reales (F8).
 
 ## Abiertos por fase (no bloquean fases anteriores; resolver **antes** de iniciar la fase indicada)
 
 | Tema | Bloquea |
 | --- | --- |
 | Verificar que Supabase Auth (alojado) acepta el dominio del email sintético (ADR 0002): puede validar dominios/MX | F1 |
-| Política de protección de datos personales y conservación (cédulas, teléfonos, direcciones) | Antes de F3 |
 | Reverso de pago cuando existen pagos posteriores: ¿se reaplican en orden o se bloquea el reverso? | F4 |
 | Reverso o ajuste que impacta una jornada ya `LIQUIDADA`: ¿en qué caja se registra el movimiento? | F4 |
 | Orden de aplicación entre cuotas y cargos de mora; ¿el tope de un pago incluye el saldo de mora? | F4 |

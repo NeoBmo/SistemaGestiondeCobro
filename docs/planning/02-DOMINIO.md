@@ -78,14 +78,14 @@ Eventos: `UsuarioCreado`, `PrimerAccesoCompletado`, `InicioSesion`, `UsuarioBloq
 
 Sin acceso de usuario en V1.
 Datos: negocio, nombre, sobrenombre opcional, identificación, dirección, teléfono, WhatsApp, notas, fechas.
-Reglas: datos de contacto editables y auditados; un cliente con historial financiero no se elimina; el cliente **no** almacena un único estado de contrato/saldo/prioridad editable — se calcula desde sus préstamos y cuotas.
+Reglas: la identificación es **única por negocio** (ADR 0007); datos de contacto editables y auditados; un cliente con historial financiero no se elimina; el cliente **no** almacena un único estado de contrato/saldo/prioridad editable — se calcula desde sus préstamos y cuotas.
 Eventos: `ClienteCreado`, `ClienteActualizado`.
 
 ### 2.2 Contrato
 
 Acuerdo entre negocio y cliente que origina **una única** operación de préstamo en V1.
 Datos: negocio, cliente, número (código legible por negocio, asignado por el sistema al confirmar; un `BORRADOR` no lo tiene), fecha/hora, admin creador, comentario opcional, origen (`NUEVO` | `IMPORTADO`), estado.
-Estados: `BORRADOR` (editable, sin deuda ni movimientos) → `CONFIRMADO` (inmutable, exactamente un préstamo) → `ANULADO` (permanece en historial).
+Estados: `BORRADOR` (editable, sin deuda ni movimientos; **no se construye en V1**: el flujo calcula una vista previa sin guardar y confirma en un solo paso, ADR 0007) → `CONFIRMADO` (inmutable, exactamente un préstamo) → `ANULADO` (permanece en historial).
 Reglas: un `CONFIRMADO` no se edita ni elimina; solo se anula si su préstamo no tiene pagos ni liquidaciones posteriores; la anulación exige motivo, auditoría y reversión explícita de cualquier desembolso inicial; la asignación a cobrador no pertenece al contrato y puede cambiar sin alterarlo.
 Eventos: `ContratoCreado`, `ContratoConfirmado`, `ContratoAnulado`.
 
@@ -101,7 +101,7 @@ Eventos: `PrestamoCreado`, `PrestamoDesembolsado`, `PrestamoPagado`, `PrestamoRe
 
 Datos: préstamo, número de orden, fecha de vencimiento, valor esperado, valor aplicado, saldo pendiente derivado, estado.
 Estados: `PENDIENTE` (saldo, no venció) | `PARCIAL` (pago recibido, conserva saldo, no venció) | `VENCIDA` (fecha pasó, conserva saldo) | `PAGADA` (saldo cero). Si una vencida tiene pago parcial: se muestra `VENCIDA — pago parcial`, sin crear un quinto estado.
-Reglas: el calendario se genera al confirmar el préstamo; la suma de cuotas = total a pagar exacto (el único ajuste de redondeo va en la última cuota, y solo al crearla — nunca por pagos posteriores); los pagos no cambian valor esperado ni fecha de las cuotas; una cuota pagada conserva su historial de atraso.
+Reglas: el calendario se genera al confirmar el préstamo, a partir de la primera fecha de cobro y en **calendario corrido** (ADR 0007): `DIARIA` = cada día calendario (incluye domingos y festivos), `SEMANAL` = +7 días, `MENSUAL` = el mismo día del mes con ajuste a fin de mes; las cuotas 1..n−1 valen el **piso** de total/n y la última, el resto hasta el total exacto; la suma de cuotas = total a pagar exacto (el único ajuste de redondeo va en la última cuota, y solo al crearla — nunca por pagos posteriores); los pagos no cambian valor esperado ni fecha de las cuotas; una cuota pagada conserva su historial de atraso.
 Eventos: `CuotasGeneradas`, `CuotaPagada`. El estado `VENCIDA` es **derivado** (no es un evento persistido ni requiere un proceso programado): una cuota con saldo está vencida cuando la fecha de hoy, en la zona horaria del negocio, es posterior a su fecha de vencimiento. Coherente con los días de mora: una cuota que vence hoy tiene 0 días de mora.
 
 ### Cálculo confirmado
