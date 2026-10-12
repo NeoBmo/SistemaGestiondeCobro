@@ -104,7 +104,7 @@ async function insertInstallments(
   for (const [index, amount] of amounts.entries()) {
     await client.query(
       `insert into public.installments (business_id, loan_id, number, due_on, amount)
-       values ($1, $2, $3, date '2026-10-14' + $3::int, $4)`,
+       values ($1, $2, $3, date '2026-10-14' + ($3::int - 1), $4)`,
       [s.a, loanId, index + 1, amount],
     );
   }
@@ -392,6 +392,8 @@ describe("préstamos y cuotas", () => {
         expect((await attempt(client, statement, [loanId]))?.code, statement).toBe(
           RESTRICT_VIOLATION,
         );
+        // Anular el préstamo sin su contrato lo rechaza la restricción diferida; aquí solo se prueba la transición.
+        await client.query("set constraints all deferred");
       }
       expect(
         await attempt(client, "update public.loans set status = 'ANULADO' where id = $1", [loanId]),
