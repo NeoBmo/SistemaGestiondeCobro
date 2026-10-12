@@ -251,7 +251,7 @@ Cierre de una jornada de Caja Menor frente a Caja Mayor.
 Datos: jornada, saldo esperado, dinero entregado, diferencia, cobrador declarante, admin que confirma, fechas, estado.
 Estados: `PENDIENTE_REVISION`, `CUADRADA`, `CON_DIFERENCIA`, `REVISADA`.
 Reglas: transfiere a Caja Mayor el dinero **realmente entregado**; la diferencia se registra como `FALTANTE`/`SOBRANTE`, exige observación y genera un movimiento `DIFERENCIA_CAJA` para cerrar la jornada en cero; resolver una diferencia genera un nuevo `AJUSTE`, nunca cambia la liquidación previa.
-Eventos: `JornadaAbierta`, `FondoOperativoTransferido`, `GastoRegistrado`, `LiquidacionDeclarada`, `LiquidacionConfirmada`, `DiferenciaRegistrada`, `AjusteRegistrado`.
+Eventos: `JornadaAbierta`, `FondoOperativoTransferido`, `SaldoAperturaRegistrado`, `CapitalIngresado`, `GastoRegistrado`, `LiquidacionDeclarada`, `LiquidacionConfirmada`, `DiferenciaRegistrada`, `AjusteRegistrado`, `ReversoRegistrado`.
 
 Fórmulas:
 
