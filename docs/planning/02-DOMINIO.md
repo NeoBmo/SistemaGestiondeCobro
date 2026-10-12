@@ -123,7 +123,8 @@ Cantidades frecuentes de cuotas: 6, 12, 24 (configurable). Frecuencia diaria es 
 ### 3.1 Pago
 
 Datos: negocio, préstamo, monto, fecha/hora, usuario que registra, cobrador o admin que recibe, observación opcional, estado (`REGISTRADO` | `REVERSADO`).
-Reglas: monto > 0 y nunca superior al saldo total exigible; un pago normal se aplica a cuotas, un pago de cargo de mora se registra explícitamente contra ese cargo; un pago no se elimina — se revierte mediante un evento nuevo con motivo que revierte sus aplicaciones y su movimiento de caja.
+Reglas: monto > 0 y nunca superior al saldo que intenta pagar (ADR 0008: un pago de cuotas, el saldo pendiente de las cuotas, sin mora; un pago de cargo de mora, el saldo de ese cargo); un pago normal se aplica a cuotas, un pago de cargo de mora se registra explícitamente contra ese cargo; un pago no se elimina — se revierte mediante un evento nuevo con motivo que revierte sus aplicaciones y su movimiento de caja.
+**Reverso (ADR 0008):** solo se reversa el pago más reciente no reversado del préstamo; para reversar uno anterior se reversan antes los posteriores, así cada reverso restaura exactamente lo que aplicó el pago y no hay reaplicaciones. El reverso es un evento nuevo con motivo: el pago y sus aplicaciones permanecen, y el movimiento de caja se compensa con un `REVERSO` (que, como todo movimiento, no puede dejar la Caja Mayor en negativo).
 Eventos: `PagoRegistrado`, `PagoAplicado`, `PagoReversado`.
 
 ### 3.2 Aplicación de pago
@@ -170,7 +171,7 @@ días de mora = máximo(0, fecha de referencia − fecha de vencimiento)
 
 Penalización monetaria **decidida manualmente** por el administrador — nunca automática.
 Datos: negocio, préstamo, cuota opcional, monto original, monto pagado, saldo pendiente, fecha, motivo, admin creador, estado (`ACTIVO`|`PAGADO`|`ANULADO`).
-Reglas: no se crea por fórmula automática; se paga solo con un pago registrado explícitamente contra el cargo; anularlo exige motivo y auditoría; un préstamo no pasa a `PAGADO` con cargos `ACTIVO` con saldo pendiente.
+Reglas: no se crea por fórmula automática; se paga solo con un pago registrado explícitamente contra el cargo; anularlo exige motivo y auditoría y solo es posible si no tiene pagos aplicados vigentes (hay que reversarlos antes); un préstamo no pasa a `PAGADO` con cargos `ACTIVO` con saldo pendiente.
 Eventos: `CargoMoraCreado`, `CargoMoraPagado`, `CargoMoraAnulado`.
 
 ### 3.5 Refinanciación
@@ -179,6 +180,7 @@ Sustitución trazable de un préstamo activo por uno nuevo.
 Datos: préstamo anterior, contrato/préstamo nuevo, saldo refinanciado, monto adicional entregado, fecha, admin creador, observación.
 Reglas:
 
+0. El préstamo anterior no puede tener cargos de mora `ACTIVO` con saldo: deben pagarse o anularse antes (ADR 0008); el saldo refinanciado es solo el saldo pendiente de las cuotas.
 1. Solo parte de un préstamo `ACTIVO`.
 2. `nuevo principal = saldo pendiente anterior + monto adicional entregado`.
 3. Se crea un contrato y préstamo nuevos con interés, cuotas, frecuencia y primera fecha propios.
