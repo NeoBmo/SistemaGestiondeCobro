@@ -63,7 +63,7 @@ npm run dev           # http://localhost:3000  (y /api/health)
 | --- | --- | --- |
 | `npm test` | Unitarias (Vitest) | — |
 | `npm run test:integration` | Contra Postgres real: inmutabilidad, transacciones, bloqueos | `npm run db:start` |
-| `npx playwright install chromium` y luego `npm run test:e2e` | Smoke e2e en desktop y móvil (usa su propio entorno ficticio) | Chromium de Playwright |
+| `npx playwright install chromium` y luego `npm run test:e2e` | Smoke e2e en desktop y móvil; si Supabase local corre (`npm run db:start`) también los recorridos con sesión real, y si no, esos se omiten | Chromium de Playwright |
 | `npm run typecheck` · `npm run lint` · `npm run format:check` | Calidad estática | — |
 | `npm run build` | Compilación de producción | — |
 
