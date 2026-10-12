@@ -50,7 +50,7 @@ type MovementInsert = {
   reference?: { type: string; id: string };
 };
 
-async function insertMovement(
+export async function insertMovement(
   tx: Tx,
   context: CashCommandContext,
   movement: MovementInsert,
