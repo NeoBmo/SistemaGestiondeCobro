@@ -109,6 +109,9 @@ export async function createBusiness(
         [userId, businessId, username, input.adminDisplayName ?? input.ownerName],
       );
 
+      // Caja Mayor: una por negocio, desde el alta (02 §5.1). Sin saldo: se deriva de sus movimientos.
+      await tx.query("insert into public.main_cashboxes (business_id) values ($1)", [businessId]);
+
       const audit = { businessId, actorId: actor.userId };
       await recordAuditEvent(tx, {
         ...audit,

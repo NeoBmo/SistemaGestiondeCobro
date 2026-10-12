@@ -97,6 +97,12 @@ describe("createBusiness", () => {
       access_status: "ACTIVO",
     });
 
+    const cashboxes = await pool.query(
+      "select 1 from public.main_cashboxes where business_id = $1",
+      [result.businessId],
+    );
+    expect(cashboxes.rowCount, "una Caja Mayor por negocio desde el alta").toBe(1);
+
     const today = localDateIn(now(), "America/Bogota");
     const subscription = await pool.query<{
       plan_code: string;

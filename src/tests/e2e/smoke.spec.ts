@@ -61,8 +61,10 @@ test("el formulario de login tiene etiquetas asociadas y se envía con el teclad
   await page.getByLabel(/^Contraseña/).press("Enter");
 
   // Sin Supabase real la respuesta es un error; lo importante es que se anuncia, no que desaparezca.
-  await expect(page.getByRole("alert")).toBeVisible();
-  await expect(page.getByRole("alert")).not.toContainText(/stack|\b50\d\b|undefined/i);
+  await expect(page.locator("main").getByRole("alert")).toBeVisible();
+  await expect(page.locator("main").getByRole("alert")).not.toContainText(
+    /stack|\b50\d\b|undefined/i,
+  );
 });
 
 test("«Mostrar contraseña» alterna el tipo del campo y expone su estado", async ({ page }) => {

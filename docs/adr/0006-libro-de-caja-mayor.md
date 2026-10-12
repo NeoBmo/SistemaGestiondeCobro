@@ -17,8 +17,8 @@ F2 construye el libro de Caja Mayor. `02` fijaba que el saldo se deriva de los m
 
 ## Forma técnica
 
-- `cash_boxes`: una por negocio y tipo; en F2 solo la Caja Mayor. Se crea con el negocio (misma transacción de `createBusiness`) y se rellena para los negocios existentes.
-- `cash_movements` (solo agregado): `business_id`, `cash_box_id`, `type`, `direction` (`ENTRADA`/`SALIDA`), `amount` `bigint > 0`, `reference_type`/`reference_id` (entidad origen), `reverses_movement_id`, `reason`, `created_by`, `created_at`. Saldo = Σ entradas − Σ salidas de la caja. Nunca se guarda.
+- `main_cashboxes`: una por negocio. Se crea con el negocio (misma transacción de `createBusiness`) y la migración la rellena para los negocios existentes. La Caja Menor no es una caja con saldo permanente: nace con la jornada (F5).
+- `cash_movements` (solo agregado): `business_id`, `cashbox_id`, `type`, `direction` (`ENTRADA`/`SALIDA`), `amount` `bigint > 0`, `reference_type`/`reference_id` (entidad origen), `reverses_movement_id`, `reason`, `created_by`, `created_at`. Saldo = Σ entradas − Σ salidas de la caja. Nunca se guarda.
 - `expenses` (solo agregado): el gasto (categoría, observación, fecha, movimiento asociado) es una entidad separada del movimiento (regla 2).
 - `idempotency_keys`: única por (`business_id`, comando, clave) con hash del payload y resultado, según `03` §3.
 - Comandos de F2, todos del Admin de negocio (§8: «ajustar caja»): saldo de apertura, ingreso de capital, gasto de Caja Mayor, ajuste, reverso.
@@ -28,3 +28,5 @@ F2 construye el libro de Caja Mayor. `02` fijaba que el saldo se deriva de los m
 - Una corrección nunca borra: deja dos movimientos (el original y su reverso/ajuste), ambos en el historial.
 - Reversar un ingreso ya gastado se rechaza si dejaría el saldo negativo; hay que registrar antes lo que corresponda.
 - Los comandos de F3 en adelante (desembolso, fondo, liquidación) reutilizan el mismo ejecutor de comandos y la misma regla de saldo.
+- Reversar el `SALDO_APERTURA` es válido (anula la entrada), pero el índice único impide registrar otro: lo que falte se agrega como `INGRESO_CAPITAL` o `AJUSTE`.
+- El saldo no negativo se garantiza en dos capas: el servicio lo comprueba bajo el bloqueo por negocio+caja y un trigger diferido de la base lo vuelve a comprobar al confirmar, tomando antes un `FOR NO KEY UPDATE` sobre la fila de la caja para que dos transacciones concurrentes no puedan pasar ambas.
