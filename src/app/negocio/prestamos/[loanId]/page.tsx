@@ -252,7 +252,19 @@ export default async function LoanPage({ params }: { params: Promise<{ loanId: s
         }))}
       />
 
-      <LateFees loanId={loan.loanId} fees={loan.lateFees} canManage={active} />
+      <LateFees
+        loanId={loan.loanId}
+        canManage={active}
+        fees={loan.lateFees.map((fee) => ({
+          id: fee.id,
+          amount: fee.amount,
+          appliedAmount: fee.appliedAmount,
+          pendingAmount: fee.pendingAmount,
+          reason: fee.reason,
+          status: fee.status,
+          voidReason: fee.voidReason,
+        }))}
+      />
     </CashFeedbackProvider>
   );
 }

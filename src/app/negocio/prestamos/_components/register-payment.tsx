@@ -74,18 +74,6 @@ export function RegisterPayment({ loanId, installments, lateFees }: Props) {
       setAmountError(parsed.message);
       return;
     }
-    if (explanation && !explanation.ok) {
-      setAmountError(
-        `El pago supera el saldo pendiente de las cuotas (${formatMoney(money(explanation.pending))}).`,
-      );
-      return;
-    }
-    if (fee && feeExcess) {
-      setAmountError(
-        `El pago supera el saldo del cargo (${formatMoney(money(fee.pendingAmount))}).`,
-      );
-      return;
-    }
     setAmountError(undefined);
     const result = await run(
       {
@@ -151,7 +139,10 @@ export function RegisterPayment({ loanId, installments, lateFees }: Props) {
         required
         readOnly={busy}
         value={amountText}
-        onChange={(event) => setAmountText(event.target.value)}
+        onChange={(event) => {
+          setAmountText(event.target.value);
+          setAmountError(undefined);
+        }}
         hint="Pesos enteros, por ejemplo 150000 o 150.000."
         error={amountError}
         className="font-mono tabular-nums"
@@ -179,6 +170,20 @@ export function RegisterPayment({ loanId, installments, lateFees }: Props) {
               </span>
             </p>
           </div>
+        ) : null}
+        {explanation && !explanation.ok ? (
+          <p className="text-warning-strong text-sm">
+            <span aria-hidden="true">! </span>
+            Supera el saldo pendiente de las cuotas ({formatMoney(money(explanation.pending))}): el
+            servidor lo rechazará.
+          </p>
+        ) : null}
+        {fee && feeExcess ? (
+          <p className="text-warning-strong text-sm">
+            <span aria-hidden="true">! </span>
+            Supera el saldo del cargo ({formatMoney(money(fee.pendingAmount))}): el servidor lo
+            rechazará.
+          </p>
         ) : null}
         {fee && parsed.ok && !feeExcess ? (
           <p className="text-sm">

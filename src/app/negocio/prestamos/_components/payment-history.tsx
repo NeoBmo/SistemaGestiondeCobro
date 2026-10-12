@@ -36,7 +36,7 @@ export function PaymentHistory({
 }) {
   return (
     <section aria-labelledby="pagos" className="mt-8">
-      <h2 id="pagos" className="text-xl font-semibold">
+      <h2 id="pagos" tabIndex={-1} className="text-xl font-semibold outline-offset-4">
         Pagos
       </h2>
       {payments.length === 0 ? (
@@ -135,6 +135,8 @@ function ReversePayment({ paymentId }: { paymentId: string }) {
         `Pago de ${formatMoney(money(result.data.amount))} reversado. Las cuotas vuelven a su saldo; saldo pendiente: ${formatMoney(money(result.data.loanPendingBalance))}. Caja Mayor: ${formatMoney(money(result.data.balance))}.`,
       );
       router.refresh();
+      // El formulario se desmonta al actualizarse: el foco pasa a un destino estable.
+      document.getElementById("pagos")?.focus();
     }
   }
 

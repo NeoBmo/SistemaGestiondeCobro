@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { parseAmountInput } from "@/modules/cash/amount-input";
-import { LOAN_FREQUENCIES } from "@/modules/portfolio/loan-calculation";
+import { LOAN_FREQUENCIES, type LoanFrequency } from "@/modules/portfolio/loan-calculation";
 import { formatIsoDate, isoDate } from "@/shared/dates/dates";
 import { formatMoney, money } from "@/shared/money/money";
 import { Alert } from "@/shared/ui/alert";
@@ -41,7 +41,7 @@ type Done = { newLoanId: string; newContractNumber: string; balance: number };
 type Terms = {
   additionalAmount: number;
   interestBps: number;
-  frequency: string;
+  frequency: LoanFrequency;
   installmentCount: number;
   firstDueOn: string;
   note?: string;
@@ -123,7 +123,7 @@ export function RefinanceLoan({
     const chosen: Terms = {
       additionalAmount: additional?.ok ? additional.amount : 0,
       interestBps: bps,
-      frequency: text("frequency"),
+      frequency: text("frequency") as LoanFrequency,
       installmentCount: count,
       firstDueOn: text("firstDueOn"),
       ...(text("note") ? { note: text("note") } : {}),

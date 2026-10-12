@@ -43,7 +43,7 @@ export function LateFees({
 }) {
   return (
     <section aria-labelledby="mora" className="mt-8">
-      <h2 id="mora" className="text-xl font-semibold">
+      <h2 id="mora" tabIndex={-1} className="text-xl font-semibold outline-offset-4">
         Cargos de mora
       </h2>
       <p className="text-muted mt-1 text-sm">
@@ -198,6 +198,7 @@ function VoidLateFee({ chargeId, reason: feeReason }: { chargeId: string; reason
     if (result.status === "success") {
       feedback.announce(`Cargo de mora «${feeReason}» anulado.`);
       router.refresh();
+      document.getElementById("mora")?.focus();
     }
   }
 

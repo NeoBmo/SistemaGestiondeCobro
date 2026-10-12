@@ -69,10 +69,11 @@ test("el Admin cobra con aplicación explicada, maneja la mora, reversa y refina
   await expect(page.getByTestId("explicacion-pago")).toContainText("queda saldada");
   await expect(page.getByTestId("explicacion-pago")).toContainText("le quedan $50.000");
 
-  // Más que el saldo pendiente se rechaza antes de llegar al servidor (no hay saldo a favor).
+  // Más que el saldo pendiente: la pantalla avisa en vivo y el servidor rechaza (no hay saldo a favor).
   await amount.fill("300001");
+  await expect(page.getByTestId("explicacion-pago")).toContainText("Supera el saldo pendiente");
   await payForm.getByRole("button", { name: "Registrar pago" }).click();
-  await expect(payForm).toContainText("supera el saldo pendiente");
+  await expect(payForm.getByRole("alert")).toBeVisible();
   await expect(page.getByTestId("pago")).toHaveCount(0);
 
   await amount.fill("150000");
