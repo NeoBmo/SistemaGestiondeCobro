@@ -46,3 +46,14 @@ export const confirmContractSchema = loanTermsSchema.extend({ comment });
 
 export type LoanTermsInput = z.output<typeof loanTermsSchema>;
 export type ConfirmContractInput = z.output<typeof confirmContractSchema>;
+
+/** Anulación (02 §2.2): el motivo es obligatorio y queda en el historial del contrato. */
+export const annulContractSchema = z.object({
+  reason: z
+    .string()
+    .trim()
+    .refine((value) => !value.includes("\0"), "El motivo no puede contener el carácter nulo")
+    .pipe(z.string().min(1).max(500)),
+});
+
+export const loanIdSchema = z.uuid();

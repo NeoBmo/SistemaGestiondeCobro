@@ -268,3 +268,132 @@ export function confirmContract(
     },
   });
 }
+
+export type AnnulledContract = {
+  contractId: string;
+  contractNumber: string;
+  loanId: string;
+  /** Movimiento que revierte el desembolso; `null` si el préstamo no tuvo desembolso (importado). */
+  reversalMovementId: string | null;
+  /** Saldo de la Caja Mayor después de devolver el desembolso. */
+  balance: number;
+};
+
+/**
+ * Anula un contrato y su préstamo (02 §2.2): exige motivo y deja el desembolso revertido de forma
+ * explícita con un `REVERSO` vinculado (nunca se borra ni se edita el movimiento original). Todo en una
+ * transacción bajo el bloqueo de la caja; el contrato y el préstamo cambian juntos (la base lo exige).
+ *
+ * Solo se anula si el préstamo no tiene pagos ni liquidaciones posteriores: en F3 todavía no existen,
+ * así que basta con que esté ACTIVO. **F4 debe añadir aquí la comprobación de pagos** (05-PENDIENTES).
+ */
+export function annulContract(
+  deps: ContractDeps,
+  actor: SessionContext,
+  input: { idempotencyKey: IdempotencyKey; loanId: string; reason: string },
+): Promise<CashCommandOutcome<AnnulledContract>> {
+  const { idempotencyKey, ...content } = input;
+  return runCashCommand<AnnulledContract>(deps, {
+    name: "AnularContrato",
+    actor,
+    idempotencyKey,
+    input: content,
+    execute: async (tx, context) => {
+      // Siempre dentro del negocio de la sesión: un préstamo de otro negocio es «no encontrado».
+      const found = await tx.query<{
+        contract_id: string;
+        number: string;
+        status: "ACTIVO" | "ANULADO";
+      }>(
+        `select k.id as contract_id, k.number, l.status
+           from public.loans l join public.contracts k on k.id = l.contract_id
+          where l.id = $1 and l.business_id = $2
+          for update of l, k`,
+        [input.loanId, context.businessId],
+      );
+      const loan = found.rows[0];
+      if (!loan) throw new AppError("LOAN_NOT_FOUND", "El préstamo no existe", 404);
+      if (loan.status !== "ACTIVO") {
+        throw new AppError("CONTRACT_ALREADY_VOIDED", "Este contrato ya está anulado", 409);
+      }
+
+      // Desembolso inicial a revertir (un préstamo importado no lo tiene, 02 §6.1).
+      const disbursement = await tx.query<{ id: string; amount: string }>(
+        `select id, amount::text from public.cash_movements
+          where business_id = $1 and type = 'DESEMBOLSO_PRESTAMO'
+            and reference_type = 'loan' and reference_id = $2`,
+        [context.businessId, input.loanId],
+      );
+      let reversalMovementId: string | null = null;
+      let balance: number | null = null;
+      const original = disbursement.rows[0];
+      if (original) {
+        const reversal = await insertMovement(tx, context, {
+          type: "REVERSO",
+          direction: "ENTRADA",
+          amount: money(original.amount),
+          reason: `Anulación del contrato ${loan.number}: ${input.reason}`,
+          reverses: original.id,
+          reference: { type: "loan", id: input.loanId },
+        });
+        reversalMovementId = reversal.id;
+        balance = reversal.balance;
+      }
+      if (balance === null) {
+        const sum = await tx.query<{ balance: string }>(
+          `select coalesce(sum(case direction when 'ENTRADA' then amount else -amount end), 0)::text as balance
+             from public.cash_movements where cashbox_id = $1`,
+          [context.cashboxId],
+        );
+        balance = money(sum.rows[0]!.balance);
+      }
+
+      await tx.query(
+        `update public.contracts
+            set status = 'ANULADO', voided_at = now(), voided_by = $2, void_reason = $3
+          where id = $1`,
+        [loan.contract_id, context.actorId, input.reason],
+      );
+      await tx.query("update public.loans set status = 'ANULADO' where id = $1", [input.loanId]);
+
+      return {
+        result: {
+          contractId: loan.contract_id,
+          contractNumber: loan.number,
+          loanId: input.loanId,
+          reversalMovementId,
+          balance,
+        },
+        audit: [
+          {
+            action: "ContratoAnulado",
+            entityType: "contract",
+            entityId: loan.contract_id,
+            summary: { number: loan.number, reason: input.reason },
+          },
+          {
+            action: "PrestamoAnulado",
+            entityType: "loan",
+            entityId: input.loanId,
+            summary: { contractId: loan.contract_id, reversalMovementId },
+          },
+          ...(reversalMovementId
+            ? [
+                {
+                  action: "ReversoRegistrado",
+                  entityType: "cash_movement",
+                  entityId: reversalMovementId,
+                  summary: {
+                    reversedMovementId: original!.id,
+                    reversedType: "DESEMBOLSO_PRESTAMO",
+                    amount: money(original!.amount),
+                    reason: `Anulación del contrato ${loan.number}`,
+                  },
+                },
+              ]
+            : []),
+        ],
+      };
+    },
+  });
+}
