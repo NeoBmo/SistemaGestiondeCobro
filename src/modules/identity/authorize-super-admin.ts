@@ -1,6 +1,5 @@
 import type { Pool } from "pg";
-import { recordAuditEvent } from "@/modules/audit/record-audit-event";
-import { withTransaction } from "@/shared/database/with-transaction";
+import { recordRejectedAttempt } from "@/modules/audit/record-rejection";
 import { isAppError } from "@/shared/errors/app-error";
 import { authorizeSession, type SessionContext } from "./session";
 
@@ -37,29 +36,11 @@ async function recordRejection(
   auditAction: string,
   businessId: string,
 ): Promise<void> {
-  try {
-    await withTransaction(async (tx) => {
-      const exists = await tx.query("select 1 from public.businesses where id = $1", [businessId]);
-      if ((exists.rowCount ?? 0) === 0) return;
-      const recent = await tx.query(
-        `select 1 from public.audit_events
-          where actor_id = $1 and entity_id = $2 and action = $3 and result = 'RECHAZADO'
-            and occurred_at > now() - interval '1 minute'`,
-        [actor.userId, businessId, auditAction],
-      );
-      if ((recent.rowCount ?? 0) > 0) return;
-      await recordAuditEvent(tx, {
-        businessId,
-        actorId: actor.userId,
-        action: auditAction,
-        entityType: "business",
-        entityId: businessId,
-        result: "RECHAZADO",
-        summary: { reason: "FORBIDDEN", role: actor.role },
-      });
-    }, db);
-  } catch {
-    // Solo el hecho: el motivo del fallo puede contener datos de la conexión.
-    console.error("[authorize] no se pudo registrar el evento RECHAZADO");
-  }
+  await recordRejectedAttempt(
+    db,
+    { actor, businessId, action: auditAction, entityType: "business", entityId: businessId },
+    async (tx) =>
+      ((await tx.query("select 1 from public.businesses where id = $1", [businessId])).rowCount ??
+        0) > 0,
+  );
 }
