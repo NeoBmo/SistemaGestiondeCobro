@@ -4,7 +4,7 @@ import { registerCapitalIncome } from "@/modules/cash/commands";
 import { getCashSummary } from "@/modules/cash/queries";
 import { loadSessionContext, type SessionContext } from "@/modules/identity/session";
 import { createClient } from "@/modules/portfolio/clients";
-import { confirmContract } from "@/modules/portfolio/contracts";
+import { annulContract, confirmContract } from "@/modules/portfolio/contracts";
 import { createLateFee, voidLateFee } from "@/modules/portfolio/late-fees";
 import { getLoanDetail } from "@/modules/portfolio/loan-queries";
 import { registerPayment, reversePayment } from "@/modules/portfolio/payments";
@@ -388,5 +388,63 @@ describe("anular un cargo de mora", () => {
     ).toMatchObject({
       code: "LATE_FEE_VOIDED",
     });
+  });
+});
+
+describe("barreras adicionales de los cargos de mora", () => {
+  it("anular es idempotente, no mueve la caja y un pago simultáneo contra la anulación deja un estado consistente", async () => {
+    const s = await setup();
+    const funds = (await getCashSummary(pool, s.admin)).balance;
+    const charge = await fee(s, 20_000);
+    const idempotencyKey = key();
+    const input = { idempotencyKey, chargeId: charge.result.chargeId, reason: "Error" };
+
+    const first = await voidLateFee(deps, s.admin, input);
+    const again = await voidLateFee(deps, s.admin, input);
+
+    expect(again).toEqual({ result: first.result, replayed: true });
+    expect(await failureOf(voidLateFee(deps, s.admin, { ...input, reason: "Otro" }))).toMatchObject(
+      {
+        code: "IDEMPOTENCY_KEY_REUSED",
+      },
+    );
+    expect((await getCashSummary(pool, s.admin)).balance).toBe(funds);
+
+    const racing = await fee(s, 10_000);
+    const outcomes = await Promise.allSettled([
+      voidLateFee(deps, s.admin, {
+        idempotencyKey: key(),
+        chargeId: racing.result.chargeId,
+        reason: "x",
+      }),
+      pay(s, 4_000, racing.result.chargeId),
+    ]);
+    const [voided, paid] = outcomes;
+    // O se anuló primero (y el pago falla por anulado) o se pagó primero (y la anulación se rechaza).
+    expect(voided!.status === "fulfilled" || paid!.status === "fulfilled").toBe(true);
+    expect(voided!.status === "fulfilled" && paid!.status === "fulfilled").toBe(false);
+    const loan = await detail(s);
+    const row = loan!.lateFees.find((f) => f.id === racing.result.chargeId)!;
+    expect(row.status === "ANULADO" ? row.appliedAmount === 0 : row.appliedAmount === 4_000).toBe(
+      true,
+    );
+    if (voided!.status === "rejected") {
+      expect((voided as PromiseRejectedResult).reason).toMatchObject({
+        code: "LATE_FEE_HAS_PAYMENTS",
+      });
+    } else {
+      expect((paid as PromiseRejectedResult).reason).toMatchObject({ code: "LATE_FEE_VOIDED" });
+    }
+  });
+
+  it("no se crean cargos ni se pagan sobre un préstamo anulado", async () => {
+    const s = await setup();
+    await annulContract(deps, s.admin, {
+      idempotencyKey: key(),
+      loanId: s.loanId,
+      reason: "Error",
+    });
+
+    expect(await failureOf(fee(s, 1_000))).toMatchObject({ code: "LOAN_NOT_ACTIVE" });
   });
 });

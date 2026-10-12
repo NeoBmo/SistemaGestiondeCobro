@@ -33,6 +33,8 @@ export function createLateFee(
     reason: string;
   },
 ): Promise<CashCommandOutcome<CreatedLateFee>> {
+  // Se valida el importe antes de autorizar: la ruta ya autorizó antes de llegar aquí (un llamador interno
+  // sin permiso verá este error antes que el 403).
   money(input.amount);
   if (input.amount <= 0)
     throw new AppError("INVALID_MONEY", "El importe debe ser mayor que cero", 400);
@@ -107,15 +109,21 @@ export function voidLateFee(
     idempotencyKey,
     input: content,
     execute: async (tx, context) => {
+      const owner = await tx.query<{ loan_id: string }>(
+        "select loan_id from public.late_fee_charges where id = $1 and business_id = $2",
+        [input.chargeId, context.businessId],
+      );
+      if (!owner.rows[0])
+        throw new AppError("LATE_FEE_NOT_FOUND", "El cargo de mora no existe", 404);
+      // Primero el préstamo, luego el estado del cargo: así lo leído no cambia hasta confirmar.
+      await lockLoan(tx, context.businessId, owner.rows[0].loan_id);
       const found = await tx.query<{ loan_id: string; amount: string; voided: boolean }>(
         `select c.loan_id, c.amount::text,
                 exists (select 1 from public.late_fee_voids v where v.charge_id = c.id) as voided
            from public.late_fee_charges c where c.id = $1 and c.business_id = $2`,
         [input.chargeId, context.businessId],
       );
-      const charge = found.rows[0];
-      if (!charge) throw new AppError("LATE_FEE_NOT_FOUND", "El cargo de mora no existe", 404);
-      await lockLoan(tx, context.businessId, charge.loan_id);
+      const charge = found.rows[0]!;
       if (charge.voided)
         throw new AppError("LATE_FEE_VOIDED", "El cargo de mora ya está anulado", 409);
 
