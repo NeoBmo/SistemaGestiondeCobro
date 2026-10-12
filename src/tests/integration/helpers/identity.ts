@@ -34,7 +34,7 @@ export async function createProfile(
   const id = await createAuthUser(client, options.username);
   await client.query(
     `insert into public.profiles (id, business_id, role, username, display_name, status)
-     values ($1, $2, $3, $4, $5, coalesce($6, 'PENDIENTE_CAMBIO_CONTRASENA'))`,
+     values ($1, $2, $3, $4, $5, coalesce($6, 'ACTIVO'))`,
     [
       id,
       options.businessId,
@@ -45,6 +45,17 @@ export async function createProfile(
     ],
   );
   return id;
+}
+
+export async function createMainCashbox(
+  client: pg.PoolClient,
+  businessId: string,
+): Promise<string> {
+  const { rows } = await client.query<{ id: string }>(
+    "insert into public.main_cashboxes (business_id) values ($1) returning id",
+    [businessId],
+  );
+  return rows[0]!.id;
 }
 
 export async function createSubscription(

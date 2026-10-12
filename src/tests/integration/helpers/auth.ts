@@ -75,6 +75,7 @@ export class TestFixtures {
          values ($1, 'MENSUAL', current_date, current_date + 30)`,
         [id],
       );
+      await client.query("insert into public.main_cashboxes (business_id) values ($1)", [id]);
       await client.query("commit");
       this.businessIds.push(id);
       return id;
@@ -159,6 +160,26 @@ export class TestFixtures {
         [this.userIds, this.businessIds],
       );
       await client.query("alter table public.audit_events enable trigger append_only_row");
+      // Los hechos de caja son de solo agregado: igual que con la auditoría, se desactiva el trigger solo aquí.
+      const ledger = ["expenses", "cash_movements", "idempotency_keys", "main_cashboxes"];
+      for (const table of ledger) {
+        await client.query(`alter table public.${table} disable trigger append_only_row`);
+      }
+      await client.query("delete from public.expenses where business_id = any($1)", [
+        this.businessIds,
+      ]);
+      await client.query("delete from public.cash_movements where business_id = any($1)", [
+        this.businessIds,
+      ]);
+      await client.query("delete from public.idempotency_keys where business_id = any($1)", [
+        this.businessIds,
+      ]);
+      await client.query("delete from public.main_cashboxes where business_id = any($1)", [
+        this.businessIds,
+      ]);
+      for (const table of ledger) {
+        await client.query(`alter table public.${table} enable trigger append_only_row`);
+      }
       // Las suscripciones primero: `changed_by` apunta a perfiles (p. ej. el Super Admin de la prueba).
       await client.query("delete from public.subscriptions where business_id = any($1)", [
         this.businessIds,

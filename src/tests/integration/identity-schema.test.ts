@@ -172,11 +172,12 @@ describe("profiles (02 §1.4, ADR 0002)", () => {
   it("nace PENDIENTE_CAMBIO_CONTRASENA y exige un usuario de Auth existente", async () => {
     await withRollback(pool, async (client) => {
       const a = await createBusiness(client, "Negocio A");
-      const id = await createProfile(client, {
-        role: "COBRADOR",
-        businessId: a,
-        username: "nuevo.usuario",
-      });
+      // Sin estado explícito (el helper de pruebas crea perfiles ACTIVO): se comprueba el valor por defecto de la tabla.
+      const id = await createAuthUser(client, "nuevo.usuario");
+      await client.query(
+        "insert into public.profiles (id, business_id, role, username, display_name) values ($1, $2, 'COBRADOR', 'nuevo.usuario', 'X')",
+        [id, a],
+      );
 
       const { rows } = await client.query("select status from public.profiles where id = $1", [id]);
       expect(rows[0]?.status).toBe("PENDIENTE_CAMBIO_CONTRASENA");
