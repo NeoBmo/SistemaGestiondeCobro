@@ -4,12 +4,50 @@
 
 ## Estado del proyecto
 
-🚧 **F0 (fundación técnica) en cierre.** Existe el esqueleto de la aplicación (Next.js, rutas base, primitivas compartidas, acceso a datos, migración base, pruebas y CI) pero **ninguna función de negocio todavía**. El siguiente paso es F1 (identidad, negocios y suscripciones), descrito en `docs/planning/04-PLAN.md`.
+🚧 **Fases F0 a F4 terminadas.** El proyecto está en el tramo de **F5 (cobradores, rutas, Caja Menor y liquidación)**: es la siguiente en la secuencia de `docs/planning/04-PLAN.md`. Quedan por delante F6, F7 y F8.
 
-**Para cerrar F0** (verificado por `verificador-de-fase`: el código cumple; faltan acciones fuera del repo):
+| Fase | Contenido | Estado |
+| --- | --- | --- |
+| F0 | Fundación técnica | Terminada |
+| F1 | Identidad, negocios y suscripciones | Terminada |
+| F2 | Libro de caja y auditoría financiera | Terminada |
+| F3 | Cartera: clientes, contratos, préstamos y cuotas | Terminada |
+| F4 | Pagos, mora y refinanciación | Terminada |
+| F5 | Cobradores, rutas, Caja Menor y liquidación | Siguiente (`src/modules/collections/` está vacío) |
+| F6 | Dashboard y operación administrativa | Pendiente |
+| F7 | Super Admin, soporte y monitoreo | Pendiente (`src/modules/support/` está vacío) |
+| F8 | Endurecimiento, prueba real y lanzamiento | Pendiente |
 
-- [x] CI en verde en GitHub (verificado en el PR #7 y en el push a `main`: los 3 jobs pasan).
-- [ ] Proteger `main` exigiendo los checks `quality`, `integration` y `e2e` antes de mergear.
+### Qué funciona hoy
+
+- **Acceso:** login, logout y cambio obligatorio de contraseña temporal.
+- **Super Admin:** alta de negocio con su cuenta admin inicial, detalle del negocio y acciones de activar, suspender, archivar, cambiar plan y restablecer contraseña.
+- **Negocio (admin):** Caja Mayor (saldo, registro de movimientos, reverso e historial), clientes (alta, edición auditada y búsqueda), préstamos (alta con vista previa, confirmación con desembolso y calendario de cuotas, detalle, anulación e importación de cartera previa).
+- **F4:** registro de pagos con aplicación cronológica a cuotas, historial de pagos, cargos de mora manuales (crear, pagar, anular), refinanciación y reverso de pagos.
+- **Cobrador:** solo layout y página de marcador de posición, sin funcionalidad (eso es F5).
+
+### Estado de verificación
+
+Ejecutado en `main` (`247fa16`):
+
+| Comando | Resultado |
+| --- | --- |
+| `npm run typecheck` | Limpio |
+| `npm run lint` | Limpio |
+| `npm test` | 48 archivos / 272 pruebas en verde |
+| `npm run test:integration` | No ejecutado: requiere Docker (Supabase local) |
+| `npm run test:e2e` | 30 smoke en verde (desktop y móvil) sin Docker; `journeys`, `portfolio` y `payments` fallan al cargar sin Supabase local |
+
+> **Sin `npm run db:start`, `npm run test:e2e` falla.** Los specs con sesión real construyen sus fixtures al cargarse, antes de que `test.skip()` pueda aplicarse, y `createAdminClient()` lanza `Falta TEST_SUPABASE_URL` (el mensaje remite a `global-setup.ts`, que es de Vitest y Playwright no ejecuta). Los smoke tests sí corren sin base de datos. En CI esto no aparece: el job levanta Supabase local.
+
+Superficie actual: 239 archivos `.ts/.tsx` en `src/`, 52 archivos `.tsx` en `src/app/`, 21 Route Handlers, 16 migraciones en `supabase/migrations/` y 8 ADRs en `docs/adr/`. Pruebas: 48 unitarias (junto al código), 35 de integración en `src/tests/integration/` y 4 e2e (`smoke`, `portfolio`, `payments`, `journeys`).
+
+### Pendientes de infraestructura
+
+No bloquean el desarrollo; son acciones fuera del repo:
+
+- [x] CI en verde en GitHub (los 3 jobs —calidad, integración y e2e— pasan en cada push a `main`).
+- [x] Proteger `main` exigiendo los checks `quality`, `integration` y `e2e` antes de mergear.
 - [ ] Conectar Vercel para previews por PR.
 - [ ] Crear los proyectos Supabase dev, preview y producción (y sus variables de entorno).
 
@@ -63,7 +101,7 @@ npm run dev           # http://localhost:3000  (y /api/health)
 | --- | --- | --- |
 | `npm test` | Unitarias (Vitest) | — |
 | `npm run test:integration` | Contra Postgres real: inmutabilidad, transacciones, bloqueos | `npm run db:start` |
-| `npx playwright install chromium` y luego `npm run test:e2e` | Smoke e2e en desktop y móvil; si Supabase local corre (`npm run db:start`) también los recorridos con sesión real, y si no, esos se omiten | Chromium de Playwright |
+| `npx playwright install chromium` y luego `npm run test:e2e` | Smoke e2e en desktop y móvil; los recorridos con sesión real (`journeys`, `portfolio`, `payments`) requieren `npm run db:start` — sin él la suite falla al cargar esos specs | Chromium de Playwright |
 | `npm run typecheck` · `npm run lint` · `npm run format:check` | Calidad estática | — |
 | `npm run build` | Compilación de producción | — |
 
