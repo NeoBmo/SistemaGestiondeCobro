@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes } from "react";
+import type { ButtonHTMLAttributes, Ref } from "react";
 import { Spinner } from "./spinner";
 
 type Variant = "primary" | "secondary" | "danger";
@@ -15,6 +15,8 @@ type Props = ButtonHTMLAttributes<HTMLButtonElement> & {
   loading?: boolean;
   /** Texto mientras `loading` (por defecto, el mismo). */
   loadingText?: string;
+  /** Para devolver el foco al botón (React 19: `ref` es una propiedad más). */
+  ref?: Ref<HTMLButtonElement>;
 };
 
 /** Objetivo táctil mínimo de 44×44 px (frontend-design §1) y foco visible global (globals.css). */

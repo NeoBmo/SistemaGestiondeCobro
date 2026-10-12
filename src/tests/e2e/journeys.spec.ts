@@ -114,7 +114,7 @@ test("un cobrador solo ve su área y no puede cruzar a las de otros roles", asyn
 
   await login(page, collector.username, collector.password);
   await expect(page).toHaveURL(/\/cobrador$/);
-  for (const forbidden of ["/super-admin", "/negocio"]) {
+  for (const forbidden of ["/super-admin", "/negocio", "/negocio/caja"]) {
     await page.goto(forbidden);
     await expect(page).toHaveURL(/\/cobrador$/);
   }
@@ -158,4 +158,87 @@ test("el Super Admin filtra la lista y la contraseña temporal restablecida no s
   await expect(page.getByTestId("temporary-password")).toBeVisible();
   await page.reload();
   await expect(page.getByTestId("temporary-password")).toHaveCount(0);
+});
+
+test("el Admin lleva la Caja Mayor: apertura, ingreso, gasto, reverso y saldo derivado", async ({
+  page,
+}) => {
+  const businessId = await fixtures.business("Negocio caja E2E");
+  const admin = await fixtures.account({ role: "ADMIN_NEGOCIO", businessId });
+
+  await login(page, admin.username, admin.password);
+  await expect(page).toHaveURL(/\/negocio$/);
+  await page.getByRole("link", { name: "Registrar saldo de apertura" }).click();
+  await expect(page).toHaveURL(/\/negocio\/caja$/);
+  await expect(page.getByTestId("saldo")).toHaveText("$0");
+  await expect(page.getByText("Aún no hay movimientos.")).toBeVisible();
+
+  const form = (name: string) => page.getByRole("form", { name });
+  const saldo = page.getByTestId("saldo");
+
+  // Validación en el cliente: un monto inválido no envía nada y explica el motivo.
+  await form("Saldo de apertura")
+    .getByLabel(/^Monto/)
+    .fill("12,5");
+  await form("Saldo de apertura")
+    .getByRole("button", { name: "Registrar saldo de apertura" })
+    .click();
+  await expect(form("Saldo de apertura").getByText(/pesos enteros/)).toBeVisible();
+
+  await form("Saldo de apertura")
+    .getByLabel(/^Monto/)
+    .fill("500.000");
+  await form("Saldo de apertura")
+    .getByRole("button", { name: "Registrar saldo de apertura" })
+    .click();
+  await expect(
+    page.getByText(/Saldo de apertura registrado\. Saldo de Caja Mayor: \$500\.000/),
+  ).toBeVisible();
+  await expect(saldo).toHaveText("$500.000");
+  // La apertura es única: su formulario desaparece.
+  await expect(form("Saldo de apertura")).toHaveCount(0);
+
+  await form("Ingreso de capital")
+    .getByLabel(/^Monto/)
+    .fill("100000");
+  await form("Ingreso de capital").getByRole("button", { name: "Registrar ingreso" }).click();
+  await expect(saldo).toHaveText("$600.000");
+
+  await form("Gasto de Caja Mayor").getByLabel("Categoría").selectOption("GASOLINA");
+  await form("Gasto de Caja Mayor")
+    .getByLabel(/^Monto/)
+    .fill("40000");
+  await form("Gasto de Caja Mayor").getByRole("button", { name: "Registrar gasto" }).click();
+  await expect(saldo).toHaveText("$560.000");
+
+  // Un gasto que supera el saldo se rechaza con un mensaje claro y el saldo no cambia.
+  await form("Gasto de Caja Mayor")
+    .getByLabel(/^Monto/)
+    .fill("9000000");
+  await form("Gasto de Caja Mayor").getByRole("button", { name: "Registrar gasto" }).click();
+  await expect(page.locator("main").getByRole("alert")).toContainText("no tiene saldo suficiente");
+  await expect(saldo).toHaveText("$560.000");
+
+  // Reverso del gasto: pide motivo, devuelve el dinero y el historial conserva ambos movimientos.
+  const gasto = page.getByTestId("movimiento").filter({ hasText: "Gasto de Caja Mayor" }).first();
+  await gasto.getByRole("button", { name: /^Reversar/ }).click();
+  await page.getByRole("button", { name: "Confirmar reverso" }).click();
+  await expect(page.getByText("Escribe el motivo del reverso.")).toBeVisible();
+  await page.getByLabel("Motivo del reverso").fill("Gasto duplicado");
+  await page.getByRole("button", { name: "Confirmar reverso" }).click();
+  await expect(saldo).toHaveText("$600.000");
+  // El resultado verificable sobrevive a la actualización del historial (el botón se desmonta).
+  await expect(
+    page.getByText(/Movimiento reversado\. Saldo de Caja Mayor: \$600\.000/),
+  ).toBeVisible();
+  await expect(page.getByText("⟲ Reversado")).toBeVisible();
+  // Lo ya reversado y los reversos no ofrecen reversar otra vez: solo quedan apertura e ingreso.
+  await expect(page.getByRole("button", { name: /^Reversar/ })).toHaveCount(2);
+  await expect(page.getByTestId("movimiento")).toHaveCount(4);
+
+  // Mobile-first: sin desbordes horizontales con el historial y todos los formularios.
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  );
+  expect(overflow).toBeLessThanOrEqual(0);
 });

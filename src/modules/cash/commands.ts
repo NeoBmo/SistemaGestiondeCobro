@@ -14,6 +14,7 @@ import {
   type CashCommandOutcome,
   type RunCashCommandDeps,
 } from "./run-cash-command";
+import { REVERSIBLE_TYPES } from "./presentation";
 import type { ExpenseCategory } from "./validation";
 
 /**
@@ -227,9 +228,6 @@ export function registerAdjustment(
   });
 }
 
-/** Tipos que nacen en F2 y que el Admin puede reversar aquí; los de F3+ se reversan en sus fases. */
-const REVERSIBLE_TYPES = ["SALDO_APERTURA", "INGRESO_CAPITAL", "GASTO_CAJA_MAYOR", "AJUSTE"];
-
 /** Reverso total y único de un movimiento propio de F2, con motivo. */
 export function reverseMovement(
   deps: RunCashCommandDeps,
@@ -250,7 +248,7 @@ export function reverseMovement(
     );
     const target = original.rows[0];
     if (!target) throw new AppError("MOVEMENT_NOT_FOUND", "El movimiento no existe", 404);
-    if (!REVERSIBLE_TYPES.includes(target.type)) {
+    if (!(REVERSIBLE_TYPES as readonly string[]).includes(target.type)) {
       throw new AppError(
         "MOVEMENT_NOT_REVERSIBLE",
         "Este tipo de movimiento no se puede reversar desde la Caja Mayor",
