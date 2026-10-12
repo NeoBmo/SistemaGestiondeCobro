@@ -303,7 +303,7 @@ export function annulContract(
       const found = await tx.query<{
         contract_id: string;
         number: string;
-        status: "ACTIVO" | "ANULADO";
+        status: "ACTIVO" | "ANULADO" | "REFINANCIADO";
       }>(
         `select k.id as contract_id, k.number, l.status
            from public.loans l join public.contracts k on k.id = l.contract_id
@@ -313,8 +313,30 @@ export function annulContract(
       );
       const loan = found.rows[0];
       if (!loan) throw new AppError("LOAN_NOT_FOUND", "El préstamo no existe", 404);
+      if (loan.status === "REFINANCIADO") {
+        throw new AppError(
+          "LOAN_REFINANCED",
+          "Este préstamo fue refinanciado: su deuda ya pasó al préstamo nuevo",
+          409,
+        );
+      }
       if (loan.status !== "ACTIVO") {
         throw new AppError("CONTRACT_ALREADY_VOIDED", "Este contrato ya está anulado", 409);
+      }
+
+      // Con pagos vigentes no se anula (02 §2.2, ADR 0008): primero se reversan (la base también lo exige).
+      const payments = await tx.query(
+        `select 1 from public.payments p
+          where p.loan_id = $1
+            and not exists (select 1 from public.payment_reversals r where r.payment_id = p.id)`,
+        [input.loanId],
+      );
+      if ((payments.rowCount ?? 0) > 0) {
+        throw new AppError(
+          "CONTRACT_HAS_PAYMENTS",
+          "El préstamo tiene pagos vigentes: reversa primero sus pagos para poder anular el contrato",
+          409,
+        );
       }
 
       // Desembolso inicial a revertir (un préstamo importado no lo tiene, 02 §6.1).
