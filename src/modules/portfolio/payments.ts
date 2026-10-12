@@ -35,7 +35,10 @@ export async function lockLoan(tx: Tx, businessId: string, loanId: string): Prom
   return loan;
 }
 
-export function assertLoanActive(loan: LoanRow, action: "pagos" | "reversos" = "pagos"): void {
+export function assertLoanActive(
+  loan: LoanRow,
+  action: "pagos" | "reversos" | "cargos de mora" = "pagos",
+): void {
   if (loan.status !== "ACTIVO") {
     const why = loan.status === "REFINANCIADO" ? "fue refinanciado" : "está anulado";
     throw new AppError("LOAN_NOT_ACTIVE", `Este préstamo ${why}: ya no recibe ${action}`, 409);
