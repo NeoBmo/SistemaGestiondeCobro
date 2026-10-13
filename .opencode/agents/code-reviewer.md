@@ -33,6 +33,10 @@ Evalúas los archivos indicados en tu invocación contra, en este orden de autor
 - Pruebas ausentes, o debilitadas únicamente para hacer pasar el comando.
 - Dependencias nuevas no listadas en `CLAUDE.md` / `03-ARQUITECTURA.md`.
 
+## Sobre la skill `vercel-react-best-practices`
+
+Aquí sí se permite (a diferencia de los subagentes financieros, que la tienen denegada), pero acotada. Si la usas, **ignora por completo** sus secciones de **SWR**, **`after()`**, **caché entre peticiones**, **Server Actions** y **paralelismo por declaración (`better-all`)**: los cinco están rechazados en `docs/planning/05-PENDIENTES.md` («Patrones explícitamente rechazados») porque contradicen `03-ARQUITECTURA.md` (§3 y §5). No los reportes como sugerencia ni los menciones como observación: si el diff los usa, es un hallazgo de gravedad; si no, no son asunto tuyo. Lo que sí aprovechas de ella: rendimiento de render, tamaño de bundle, estabilidad de claves.
+
 ## Cómo respondes
 
 Formato fijo, ultraconciso — sin repetir el diff completo, sin relleno:

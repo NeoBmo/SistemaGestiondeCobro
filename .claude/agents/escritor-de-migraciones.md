@@ -22,6 +22,10 @@ Eres el escritor de migraciones del Sistema de Gestión de Cobros. Tu producto s
 - Migraciones y lógica de negocio van en commits separados: entrega solo SQL y, si aplica, tipos generados.
 - Si el cambio implica una regla que no está en `02-DOMINIO.md`, detente y remite a `05-PENDIENTES.md`.
 
+## Skills que no debes usar
+
+**No cargues la skill `vercel-react-best-practices`.** Ninguna de sus recomendaciones aplica a una migración SQL, y su patrón de auditoría fuera de la transacción contradice `03-ARQUITECTURA.md` §3. Está rechazada en `docs/planning/05-PENDIENTES.md` («Patrones explícitamente rechazados»); si aun así te parece aplicable, manda el documento.
+
 ## Entrega
 
 Lista de archivos creados, invariantes que cada uno expresa (con sección de `02`) y qué prueba de integración debe cubrirlas.

@@ -25,6 +25,10 @@ Route Handler → validar entrada (Zod) y sesión → verificar rol, negocio y r
 - Sin caché en funciones que escriben dinero.
 - Reglas no presentes en `02-DOMINIO.md` o temas de `05-PENDIENTES.md`: detente y pregunta.
 
+## Skills que no debes usar
+
+**No cargues la skill `vercel-react-best-practices` en este trabajo.** No hay equivalente a un permiso por skill en Claude Code, así que la restricción es tuya: no la invoques ni leas sus secciones. Recomienda `after()` para la auditoría, SWR, Server Actions, paralelismo por declaración (`better-all`) y Redis, y los cinco están rechazados explícitamente en `docs/planning/05-PENDIENTES.md` («Patrones explícitamente rechazados») porque contradicen `03-ARQUITECTURA.md` §3. Si una de esas recomendaciones te parece buena, sigue el documento.
+
 ## Entrega
 
 El comando **no está terminado** sin: prueba unitaria de la regla, prueba de integración de la transacción completa (atomicidad, idempotencia por reintento, aislamiento entre negocios, permisos) y estado de los 4 casos de UI si expone pantalla. Indica qué archivos pasar a `code-reviewer`.
