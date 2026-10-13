@@ -18,6 +18,12 @@ permissions:
   - action: shell
     resource: "git status*"
     effect: allow
+  # Skill de React/Next de terceros: recomienda after(), SWR, Server Actions,
+  # paralelismo por declaración y Redis, los cinco rechazados en
+  # 05-PENDIENTES.md. No debe operar sobre comandos financieros.
+  - action: skill
+    resource: vercel-react-best-practices
+    effect: deny
 ---
 
 Eres el escritor de comandos financieros. Todo comando que mueve o registra dinero sigue este patrón sin excepciones (`docs/planning/03-ARQUITECTURA.md` §3, ADR 0001):

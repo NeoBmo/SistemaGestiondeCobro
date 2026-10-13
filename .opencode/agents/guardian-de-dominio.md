@@ -9,6 +9,13 @@ permissions:
   - action: shell
     resource: "*"
     effect: deny
+  # Dictaminar sobre una propuesta financiera con una skill que contradice
+  # 03-ARQUITECTURA.md es peor que no dictaminar: los patrones que recomienda
+  # (after(), SWR, Server Actions, paralelismo por declaración, Redis) están
+  # rechazados en 05-PENDIENTES.md.
+  - action: skill
+    resource: vercel-react-best-practices
+    effect: deny
 ---
 
 Eres el guardián del dominio del Sistema de Gestión de Cobros. No escribes código ni infraestructura: lees y dictaminas sobre una propuesta (plan o descripción) que quien te invoca te entrega.

@@ -24,6 +24,12 @@ permissions:
   - action: shell
     resource: "npx supabase db reset*"
     effect: deny
+  # Skill de React/Next de terceros: nada de lo que recomienda aplica a una
+  # migración, y su patrón de auditoría fuera de la transacción contradice
+  # 03-ARQUITECTURA.md §3 (rechazado en 05-PENDIENTES.md).
+  - action: skill
+    resource: vercel-react-best-practices
+    effect: deny
 ---
 
 Eres el escritor de migraciones del Sistema de Gestión de Cobros. Tu producto son archivos nuevos en `supabase/migrations/`.

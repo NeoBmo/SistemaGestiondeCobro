@@ -12,6 +12,36 @@
 
 Ante conflicto: `CLAUDE.md` para política del repo, `02` para reglas de negocio, `03` para decisiones técnicas. Este archivo solo describe el estado real y las trampas del tooling.
 
+### Orden de autoridad (skills incluidas)
+
+De mayor a menor:
+
+1. `CLAUDE.md`.
+2. `docs/planning/02-DOMINIO.md` (negocio) y `docs/planning/03-ARQUITECTURA.md` (técnico).
+3. `AGENTS.md`.
+4. `docs/planning/05-PENDIENTES.md` y `docs/planning/07-FLUJO-DE-TRABAJO.md`.
+5. `.claude/agents/` y `.claude/skills/`.
+
+**La regla que lo gobierna:** una skill **nunca** introduce una regla que no esté en los niveles 1-4. Si una skill la contradice, **manda el documento** y lo que se corrige es la skill, no al revés. `docs/planning/06-AGENTES-HABILIDADES.md:36` ya dice esto para los subagentes ("si un subagente y `CLAUDE.md` entran en conflicto, gana `CLAUDE.md`"); aquí se extiende a las skills, que son material de terceros y pueden cambiar de versión sin avisar.
+
+### Reparto por skill (sin solapes)
+
+| Skill | Cuándo | Alcance y límite |
+| --- | --- | --- |
+| `grilling` (lanzador: `grill-me`) | **Antes** de escribir, para afinar un plan o una decisión | Solo por invocación humana (`disable-model-invocation: true`). Debe terminar en la **decisión escrita** en `02`/`03`, y si venía de `05-PENDIENTES.md`, borrada de ahí en el mismo PR (`07-FLUJO-DE-TRABAJO.md:50`). No reabre nada de la sección «Explícitamente NO pendiente» de `05-PENDIENTES.md`. |
+| `revisar-pendientes` | **Después** de escribir, sobre el diff | Mismo objetivo que `grilling` pero **otro momento**: pre vs post. Ninguna sustituye a la otra. |
+| `systematic-debugging` | Ante cualquier fallo o comportamiento inesperado | Refuerza `07-FLUJO-DE-TRABAJO.md` §4: «la prueba nueva pasa» ≠ «toda la suite pasa». Ante una prueba roja se corrige **el código**, nunca la prueba (`07:46`). |
+| `nueva-entidad-dominio`, `nuevo-comando-financiero` | Scaffolding de trabajo **nuevo** | **No** son herramientas de depuración: no se invocan para arreglar un fallo ya existente. |
+| `web-design-guidelines` | Auditoría de UI / a11y / UX | Skill de auditoría: **descarga las reglas de una URL en cada uso**, así que requiere red. No es fuente normativa: si contradice `.claude/rules/frontend-design.md`, manda el archivo del repo. |
+| `frontend-design` | Dirección estética: tipografía, identidad visual, layout | **Solo donde el repo no fija nada.** Donde `frontend-design.md` manda, no aplica. |
+| `vercel-react-best-practices` | **Solo** revisión de UI y componentes | **Prohibida** en comandos financieros, migraciones y dictámenes de dominio: ver la nota siguiente. |
+
+`vercel-react-best-practices` recomienda `after()`, SWR, Server Actions, paralelismo por declaración y Redis. Los cinco contradicen `03-ARQUITECTURA.md` y están registrados como **rechazados** en la sección «Explícitamente NO pendiente» de `05-PENDIENTES.md`. Por eso los tres subagentes financieros la tienen denegada por permisos (`.opencode/agents/`) y por instrucción explícita (`.claude/agents/`); `code-reviewer` sí puede verla, pero con esas cinco secciones marcadas como no aplicables.
+
+### El criterio, para que la regla sobrevja a los cambios de versión
+
+No «qué skill es más nueva» ni «qué dice la skill», sino esto: **manda el documento cuando la regla es un requisito** respaldado por `02`/`03`/`04` o por una prueba ejecutable (invariantes, secciones de auditoría, idempotencia, formato de `Money`); **manda la skill cuando es estética** y el repo no dice nada (tipografía, jerarquía visual, accesibilidad no cubierta). Ante la duda, es un requisito: pregunta y anótalo en `05-PENDIENTES.md`.
+
 ## Estado actual
 
 - Fases **F0–F4 terminadas**. Sigue **F5**: cobradores, rutas de cobro, Caja Menor y liquidación.
@@ -137,7 +167,7 @@ Solo sube parches o minors de bajo riesgo, y siempre revisa la tabla de stack de
 
 ## Subagentes y skills
 
-Los subagentes de `.opencode/agents/` y los skills de `.claude/skills/` están cableados en `opencode.json`. Úsalos en el orden que fija `docs/planning/06-AGENTES-HABILIDADES.md`: validar dominio → escribir migración → escribir comando → escribir pruebas → revisar → verificar fase.
+Los subagentes de `.opencode/agents/` y los skills de `.claude/skills/` están cableados en `opencode.json`. Úsalos en el orden que fija `docs/planning/06-AGENTES-HABILIDADES.md`: validar dominio → escribir migración → escribir comando → escribir pruebas → revisar → verificar fase. Cuándo usar cada skill y cuál pierde ante un conflicto, en «Orden de autoridad (skills incluidas)» más arriba.
 
 ## Estilo de respuesta
 
