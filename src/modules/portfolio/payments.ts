@@ -75,6 +75,20 @@ export async function activeChargeBalance(tx: Tx, loanId: string): Promise<numbe
   return money(rows[0]!.balance);
 }
 
+/** El préstamo es de un cliente con asignación activa a este cobrador; si no, «no existe» (no se revela). */
+async function assertInPortfolio(tx: Tx, loanId: string, collectorId: string): Promise<void> {
+  const { rowCount } = await tx.query(
+    `select 1
+       from public.loans l
+       join public.contracts k on k.id = l.contract_id
+       join public.client_assignments a on a.client_id = k.client_id and a.status = 'ACTIVA'
+      where l.id = $1 and a.collector_id = $2
+      for share of a`,
+    [loanId, collectorId],
+  );
+  if ((rowCount ?? 0) === 0) throw new AppError("LOAN_NOT_FOUND", "El préstamo no existe", 404);
+}
+
 export type PaymentApplicationView = {
   /** Cuota a la que se aplicó (número de orden), o `null` si fue un pago de cargo de mora. */
   installmentNumber: number | null;
@@ -117,6 +131,28 @@ export function registerPayment(
   actor: SessionContext,
   input: RegisterPaymentInput,
 ): Promise<CashCommandOutcome<RegisteredPayment>> {
+  return runRegisterPayment(deps, actor, input, "ADMIN_NEGOCIO");
+}
+
+/**
+ * El cobrador registra un cobro (02 §3.1, §8, ADR 0009): entra como un `COBRO` a su jornada `ABIERTA` (no a la
+ * Caja Mayor), en la misma transacción que reduce la deuda, y solo sobre clientes de su cartera (asignación
+ * activa). Un cliente ajeno es «no encontrado»: no se revela su existencia.
+ */
+export function registerCollectorPayment(
+  deps: ContractDeps,
+  actor: SessionContext,
+  input: RegisterPaymentInput,
+): Promise<CashCommandOutcome<RegisteredPayment>> {
+  return runRegisterPayment(deps, actor, input, "COBRADOR");
+}
+
+function runRegisterPayment(
+  deps: ContractDeps,
+  actor: SessionContext,
+  input: RegisterPaymentInput,
+  role: "ADMIN_NEGOCIO" | "COBRADOR",
+): Promise<CashCommandOutcome<RegisteredPayment>> {
   // Defensa en profundidad: el servicio no confía en que la ruta ya validó el importe.
   money(input.amount);
   if (input.amount <= 0)
@@ -124,11 +160,24 @@ export function registerPayment(
   const { idempotencyKey, ...content } = input;
   return runCashCommand<RegisteredPayment>(deps, {
     name: "RegistrarPago",
+    role,
     actor,
     idempotencyKey,
     input: content,
     execute: async (tx, context) => {
+      let sessionId: string | null = null;
+      if (role === "COBRADOR") {
+        const open = await tx.query<{ id: string }>(
+          "select id from public.cash_sessions where collector_id = $1 and status = 'ABIERTA'",
+          [context.collectorId],
+        );
+        sessionId = open.rows[0]?.id ?? null;
+        if (!sessionId) {
+          throw new AppError("NO_OPEN_SESSION", "Abre tu jornada antes de registrar un cobro", 409);
+        }
+      }
       const loan = await lockLoan(tx, context.businessId, input.loanId);
+      if (role === "COBRADOR") await assertInPortfolio(tx, input.loanId, context.collectorId!);
       assertLoanActive(loan);
 
       const paymentId = randomUUID();
@@ -203,6 +252,7 @@ export function registerPayment(
         amount: input.amount,
         note: input.note,
         reference: { type: "payment", id: paymentId },
+        sessionId,
       });
       await tx.query(
         `insert into public.payments (id, business_id, loan_id, kind, late_fee_charge_id, amount, movement_id, note, registered_by)
@@ -366,6 +416,19 @@ export function reversePayment(
       }
 
       const amount = money(payment.amount);
+      // El cobro de una jornada se reversa en su Caja Menor mientras esté ABIERTA o PENDIENTE; si ya se
+      // liquidó, la corrección va a la Caja Mayor y la jornada no cambia (ADR 0009).
+      const origin = await tx.query<{ session_id: string | null; session_status: string | null }>(
+        `select m.session_id, s.status as session_status
+           from public.cash_movements m left join public.cash_sessions s on s.id = m.session_id
+          where m.id = $1`,
+        [payment.movement_id],
+      );
+      const sessionId =
+        origin.rows[0]!.session_status === "ABIERTA" ||
+        origin.rows[0]!.session_status === "PENDIENTE_LIQUIDACION"
+          ? origin.rows[0]!.session_id
+          : null;
       const reversal = await insertMovement(tx, context, {
         type: "REVERSO",
         direction: "SALIDA",
@@ -373,6 +436,7 @@ export function reversePayment(
         reason: `Reverso del pago: ${input.reason}`,
         reverses: payment.movement_id,
         reference: { type: "payment", id: payment.id },
+        sessionId,
       });
       const reversalId = (
         await tx.query<{ id: string }>(

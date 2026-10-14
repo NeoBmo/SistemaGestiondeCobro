@@ -1,6 +1,7 @@
 import type { Pool } from "pg";
 import { recordAuditEvent, type AuditEventInput } from "@/modules/audit/record-audit-event";
 import { authorizeBusinessAdmin } from "@/modules/identity/authorize-business-admin";
+import { authorizeCollector } from "@/modules/identity/authorize-collector";
 import type { SessionContext } from "@/modules/identity/session";
 import { payloadHash } from "@/shared/commands/canonical-json";
 import { setLockTimeout, translateLockTimeout } from "@/shared/database/lock-timeout";
@@ -31,6 +32,8 @@ export type CashCommandContext = {
   actorId: string;
   /** Caja Mayor del negocio, ya bloqueada para esta transacción. */
   cashboxId: string;
+  /** Solo en los comandos del cobrador: su cobrador activo (ADR 0009). */
+  collectorId?: string;
 };
 
 export type CashCommandAudit = Omit<AuditEventInput, "businessId" | "actorId" | "result">;
@@ -38,6 +41,8 @@ export type CashCommandAudit = Omit<AuditEventInput, "businessId" | "actorId" | 
 export type CashCommand<R> = {
   /** Nombre estable del comando: espacio de nombres de la clave de idempotencia (p. ej. `RegistrarGasto`). */
   name: string;
+  /** Quién puede ejecutarlo: el Admin de negocio (por defecto) o el Cobrador (02 §8). */
+  role?: "ADMIN_NEGOCIO" | "COBRADOR";
   actor: SessionContext;
   idempotencyKey: IdempotencyKey;
   /** Entrada ya validada; se canoniza y se hashea para detectar una clave reutilizada con otro contenido. */
@@ -61,7 +66,10 @@ export async function runCashCommand<R>(
   command: CashCommand<R>,
 ): Promise<CashCommandOutcome<R>> {
   const { actor } = command;
-  const businessId = await authorizeCashActor(deps, actor, command.name);
+  const businessId =
+    command.role === "COBRADOR"
+      ? await authorizeCollector(deps.db, actor, command.name)
+      : await authorizeCashActor(deps, actor, command.name);
 
   try {
     return await withTransaction(async (tx) => {
@@ -79,7 +87,10 @@ export async function runCashCommand<R>(
         `main-cashbox:${cashboxId}`,
       ]);
 
-      const hash = payloadHash(command.input);
+      // La clave de un cobrador es suya: otro cobrador del negocio con la misma clave no recibe su resultado.
+      const hash = payloadHash(
+        command.role === "COBRADOR" ? { actor: actor.userId, input: command.input } : command.input,
+      );
       const reserved = await tx.query<{ id: string }>(
         `insert into public.idempotency_keys (business_id, command, key, payload_hash)
          values ($1, $2, $3, $4)
@@ -92,10 +103,23 @@ export async function runCashCommand<R>(
         return replay<R>(tx, businessId, command, hash);
       }
 
+      let collectorId: string | undefined;
+      if (command.role === "COBRADOR") {
+        const collector = await tx.query<{ id: string }>(
+          "select id from public.collectors where user_id = $1 and business_id = $2 and status = 'ACTIVO' for share",
+          [actor.userId, businessId],
+        );
+        collectorId = collector.rows[0]?.id;
+        if (!collectorId) {
+          throw new AppError("FORBIDDEN", "Tu cuenta de cobrador no está activa", 403);
+        }
+      }
+
       const { result, audit } = await command.execute(tx, {
         businessId,
         actorId: actor.userId,
         cashboxId,
+        collectorId,
       });
       if (audit.length === 0) {
         // Un comando financiero sin auditoría es un error de programación: no se guarda nada.
