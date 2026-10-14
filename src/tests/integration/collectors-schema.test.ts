@@ -330,14 +330,15 @@ describe("asignaciones", () => {
       expect(
         (await attempt(client, assignSql, [a.id, clientId, closed, c2.id, a.admin]))?.code,
       ).toBe(CHECK_VIOLATION);
-      // Cobrador inactivo (sin ruta activa posible: se prueba con su ruta histórica).
-      const old = await route(client, a, inactive.id);
-      await client.query(
-        "update public.routes set status = 'CERRADA', closed_at = now() where id = $1",
-        [old],
-      );
+      // Una ruta nueva exige un cobrador activo.
       expect(
-        (await attempt(client, assignSql, [a.id, clientId, old, inactive.id, a.admin]))?.code,
+        (
+          await attempt(
+            client,
+            "insert into public.routes (business_id, collector_id, name, started_on, created_by) values ($1, $2, 'X', current_date, $3)",
+            [a.id, inactive.id, a.admin],
+          )
+        )?.code,
       ).toBe(CHECK_VIOLATION);
       // Cliente de otro negocio.
       expect(
@@ -381,6 +382,70 @@ describe("asignaciones", () => {
   });
 });
 
+describe("fechas de cierre y suscripción", () => {
+  it("la fecha de cierre de una ruta o asignación cerradas no se reescribe", async () => {
+    await withRollback(pool, async (client) => {
+      const a = await business(client);
+      const c = await collector(client, a);
+      const routeId = await route(client, a, c.id);
+      const clientId = await clientOf(client, a);
+      await client.query(assignSql, [a.id, clientId, routeId, c.id, a.admin]);
+      await client.query(
+        "update public.client_assignments set status = 'CERRADA', ended_at = now() where route_id = $1",
+        [routeId],
+      );
+      await client.query(
+        "update public.routes set status = 'CERRADA', closed_at = now() where id = $1",
+        [routeId],
+      );
+
+      for (const statement of [
+        "update public.routes set closed_at = now() + interval '1 day'",
+        "update public.client_assignments set ended_at = now() + interval '1 day'",
+      ]) {
+        expect((await attempt(client, statement))?.code, statement).toBe(RESTRICT_VIOLATION);
+      }
+      // No se cierra «antes de empezar».
+      const other = await collector(client, a);
+      const early = await route(client, a, other.id);
+      expect(
+        (
+          await attempt(
+            client,
+            "update public.routes set status = 'CERRADA', closed_at = now() - interval '1 day' where id = $1",
+            [early],
+          )
+        )?.code,
+      ).toBe(CHECK_VIOLATION);
+    });
+  });
+
+  it("sin suscripción no se activa un cobrador (falla cerrado)", async () => {
+    await withRollback(pool, async (client) => {
+      const id = await createBusiness(client, `Sin suscripción ${next()}`);
+      const admin = await createProfile(client, {
+        role: "ADMIN_NEGOCIO",
+        businessId: id,
+        username: `admin.${next()}`,
+      });
+      const user = await createProfile(client, {
+        role: "COBRADOR",
+        businessId: id,
+        username: `cob.${next()}`,
+      });
+      expect(
+        (
+          await attempt(
+            client,
+            "insert into public.collectors (business_id, user_id, name, created_by) values ($1, $2, 'X', $3)",
+            [id, user, admin],
+          )
+        )?.code,
+      ).toBe(CHECK_VIOLATION);
+    });
+  });
+});
+
 describe("acceso por la API de datos", () => {
   it("el admin ve su negocio, el cobrador solo lo suyo y nadie ve lo ajeno ni escribe", async () => {
     await withRollback(pool, async (client) => {
@@ -416,6 +481,15 @@ describe("acceso por la API de datos", () => {
 
       await asApiUser(client, { sub: mine.user, app_role: "COBRADOR", business_id: a.id });
       for (const table of tables) expect(await count(table), `cobrador ${table}`).toBe("1");
+      await resetApiUser(client);
+
+      // Al cerrarse la asignación, el cobrador deja de verla (ADR 0009).
+      await client.query(
+        "update public.client_assignments set status = 'CERRADA', ended_at = now() where collector_id = $1",
+        [mine.id],
+      );
+      await asApiUser(client, { sub: mine.user, app_role: "COBRADOR", business_id: a.id });
+      expect(await count("client_assignments")).toBe("0");
       await resetApiUser(client);
 
       await asApiUser(client, { sub: b.admin, app_role: "ADMIN_NEGOCIO", business_id: b.id });
