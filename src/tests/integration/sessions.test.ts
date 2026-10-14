@@ -181,6 +181,39 @@ async function assignAway(w: World) {
   await assignClient(deps, w.admin, { clientId: w.clientId, routeId: route.routeId });
 }
 
+describe("idempotencia por actor", () => {
+  it("la clave de un cobrador no devuelve su resultado a otro cobrador ni admite otro contenido", async () => {
+    const w = await world();
+    const other = await world();
+    const idempotencyKey = key();
+
+    const first = await openSession(deps, w.collector, { idempotencyKey }, now);
+    // Otro cobrador (de otro negocio, pero lo mismo vale dentro del suyo) con la misma clave: ni la ve ni la pisa.
+    const second = await openSession(deps, other.collector, { idempotencyKey }, now);
+    expect(second.replayed).toBe(false);
+    expect(second.result.sessionId).not.toBe(first.result.sessionId);
+
+    // Misma clave, otro contenido: se rechaza.
+    const sessionId = first.result.sessionId;
+    await fund(w, sessionId, 10_000);
+    const paymentKey = key();
+    await registerCollectorPayment(deps, w.collector, {
+      idempotencyKey: paymentKey,
+      loanId: w.loanId,
+      amount: 1000,
+    });
+    expect(
+      await failureOf(
+        registerCollectorPayment(deps, w.collector, {
+          idempotencyKey: paymentKey,
+          loanId: w.loanId,
+          amount: 2000,
+        }),
+      ),
+    ).toMatchObject({ code: "IDEMPOTENCY_KEY_REUSED" });
+  });
+});
+
 describe("fondo operativo", () => {
   it("el Admin transfiere fondo (varias veces) y las dos cajas cuadran; sin saldo en la Mayor se rechaza", async () => {
     const w = await world();

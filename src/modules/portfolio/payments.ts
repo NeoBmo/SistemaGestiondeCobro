@@ -82,7 +82,8 @@ async function assertInPortfolio(tx: Tx, loanId: string, collectorId: string): P
        from public.loans l
        join public.contracts k on k.id = l.contract_id
        join public.client_assignments a on a.client_id = k.client_id and a.status = 'ACTIVA'
-      where l.id = $1 and a.collector_id = $2`,
+      where l.id = $1 and a.collector_id = $2
+      for share of a`,
     [loanId, collectorId],
   );
   if ((rowCount ?? 0) === 0) throw new AppError("LOAN_NOT_FOUND", "El préstamo no existe", 404);

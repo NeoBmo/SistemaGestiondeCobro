@@ -87,7 +87,10 @@ export async function runCashCommand<R>(
         `main-cashbox:${cashboxId}`,
       ]);
 
-      const hash = payloadHash(command.input);
+      // La clave de un cobrador es suya: otro cobrador del negocio con la misma clave no recibe su resultado.
+      const hash = payloadHash(
+        command.role === "COBRADOR" ? { actor: actor.userId, input: command.input } : command.input,
+      );
       const reserved = await tx.query<{ id: string }>(
         `insert into public.idempotency_keys (business_id, command, key, payload_hash)
          values ($1, $2, $3, $4)

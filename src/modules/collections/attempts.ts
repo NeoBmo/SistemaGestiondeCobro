@@ -25,7 +25,7 @@ export function registerAttempt(
 ): Promise<CashCommandOutcome<RegisteredAttempt>> {
   const { idempotencyKey, ...content } = input;
   return runCashCommand<RegisteredAttempt>(deps, {
-    name: input.type === "INTENTO_FALLIDO" ? "RegistrarIntentoFallido" : "RegistrarVolverACobrar",
+    name: "RegistrarIntentoCobro",
     role: "COBRADOR",
     actor,
     idempotencyKey,
