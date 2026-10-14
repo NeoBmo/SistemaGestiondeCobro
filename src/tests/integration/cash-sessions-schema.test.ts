@@ -19,7 +19,6 @@ afterAll(() => pool.end());
 const CHECK_VIOLATION = "23514";
 const RESTRICT_VIOLATION = "23001";
 const UNIQUE_VIOLATION = "23505";
-const FOREIGN_KEY_VIOLATION = "23503";
 
 let counter = 0;
 const next = () => ++counter;
@@ -788,7 +787,7 @@ describe("aislamiento y acceso", () => {
             [a.business, a.box, sessionB, a.collectorUser],
           )
         )?.code,
-      ).toBe(FOREIGN_KEY_VIOLATION);
+      ).toBe(CHECK_VIOLATION);
 
       const count = async (table: string) =>
         (await client.query<{ n: string }>(`select count(*)::text as n from public.${table}`))

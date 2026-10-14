@@ -96,7 +96,7 @@ export async function previewLoan(
 
   const { rows } = await deps.db.query<{ balance: string }>(
     `select coalesce(sum(case direction when 'ENTRADA' then amount else -amount end), 0)::text as balance
-       from public.cash_movements where business_id = $1`,
+       from public.cash_movements where business_id = $1 and session_id is null`,
     [businessId],
   );
   const cashBalance = money(rows[0]!.balance);
@@ -375,7 +375,7 @@ export function annulContract(
       if (balance === null) {
         const sum = await tx.query<{ balance: string }>(
           `select coalesce(sum(case direction when 'ENTRADA' then amount else -amount end), 0)::text as balance
-             from public.cash_movements where cashbox_id = $1`,
+             from public.cash_movements where cashbox_id = $1 and session_id is null`,
           [context.cashboxId],
         );
         balance = money(sum.rows[0]!.balance);

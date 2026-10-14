@@ -9,7 +9,7 @@ import { money, type Money } from "@/shared/money/money";
 export async function getCashboxBalance(tx: Tx, cashboxId: string): Promise<Money> {
   const { rows } = await tx.query<{ balance: string }>(
     `select coalesce(sum(case direction when 'ENTRADA' then amount else -amount end), 0)::text as balance
-       from public.cash_movements where cashbox_id = $1`,
+       from public.cash_movements where cashbox_id = $1 and session_id is null`,
     [cashboxId],
   );
   return money(rows[0]!.balance);
