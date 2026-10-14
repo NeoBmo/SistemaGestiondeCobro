@@ -197,7 +197,7 @@ Eventos: `RefinanciacionCreada`, `SaldoAnteriorRefinanciado`, `MontoAdicionalDes
 ### 4.1 Cobrador
 
 Datos: negocio, usuario asociado, nombre, fecha de creación, estado (`ACTIVO`|`INACTIVO`).
-Reglas: pertenece a un único negocio; puede crearse sin ruta ni clientes; solo consulta/opera sobre su propia ruta, caja y eventos.
+Reglas: pertenece a un único negocio; puede crearse sin ruta ni clientes; solo consulta/opera sobre su propia ruta, caja y eventos. Desactivarlo (`INACTIVO`) bloquea su cuenta y reactivarlo la desbloquea; solo si no tiene jornada `ABIERTA`/`PENDIENTE_LIQUIDACION` ni ruta `ACTIVA` (ADR 0009). Un plan semanal no admite un sexto cobrador `ACTIVO` y no se baja de plan con más activos que el tope (409).
 
 ### 4.2 Ruta
 
@@ -209,7 +209,7 @@ Regla: cada cobrador tiene como máximo una ruta `ACTIVA`.
 
 Período durante el que un cliente está bajo responsabilidad de una ruta/cobrador.
 Datos: negocio, cliente, ruta, cobrador, fecha/hora inicio, fecha/hora fin opcional, estado (`ACTIVA`|`CERRADA`).
-Reglas: un cliente tiene como máximo una asignación `ACTIVA`; reasignar cierra la anterior y crea una nueva (nunca sustituye historia); la asignación no modifica contrato ni préstamo.
+Reglas: un cliente tiene como máximo una asignación `ACTIVA`; reasignar cierra la anterior y crea una nueva (nunca sustituye historia); la asignación no modifica contrato ni préstamo; al cerrarse, el cobrador anterior pierde acceso al cliente, sus pagos e intentos (ADR 0009).
 Eventos: `RutaCreada`, `ClienteAsignado`, `ClienteReasignado`, `RutaCerrada`.
 
 ### 4.4 Evento de intento de cobro
@@ -234,7 +234,7 @@ Reglas (ADR 0006): el saldo de Caja Mayor **nunca queda negativo** — todo movi
 Caja operativa de un cobrador durante una jornada (no una caja con saldo permanente).
 Datos: negocio, cobrador, fecha, fondo operativo recibido, saldo esperado derivado, dinero entregado, diferencia derivada, estado, fechas de apertura/cierre.
 Estados: `ABIERTA` → `PENDIENTE_LIQUIDACION` → `LIQUIDADA` | `LIQUIDADA_CON_DIFERENCIA`.
-Reglas: máximo una jornada abierta/pendiente por cobrador por día; inicia en cero y recibe fondo desde Caja Mayor; liquidada queda en cero; no se registran pagos/gastos en jornada cerrada. Un cobrador **no puede registrar cobros ni gastos sin una jornada `ABIERTA`**, y **no puede abrir una jornada nueva mientras tenga otra en `PENDIENTE_LIQUIDACION`, de cualquier día**.
+Reglas: máximo una jornada abierta/pendiente por cobrador por día; inicia en cero y recibe fondo desde Caja Mayor; liquidada queda en cero; no se registran pagos/gastos en jornada cerrada. El fondo operativo es la suma de las transferencias que el Admin hace mientras la jornada está `ABIERTA` (una o más, puede ser cero); el saldo esperado no queda negativo (ADR 0009). Un cobrador **no puede registrar cobros ni gastos sin una jornada `ABIERTA`**, y **no puede abrir una jornada nueva mientras tenga otra en `PENDIENTE_LIQUIDACION`, de cualquier día**.
 
 ### 5.3 Movimiento de caja
 
@@ -253,7 +253,7 @@ Corregir/rechazar un gasto genera un `AJUSTE`; nunca cambia ni borra el gasto or
 Cierre de una jornada de Caja Menor frente a Caja Mayor.
 Datos: jornada, saldo esperado, dinero entregado, diferencia, cobrador declarante, admin que confirma, fechas, estado.
 Estados: `PENDIENTE_REVISION`, `CUADRADA`, `CON_DIFERENCIA`, `REVISADA`.
-Reglas: transfiere a Caja Mayor el dinero **realmente entregado**; la diferencia se registra como `FALTANTE`/`SOBRANTE`, exige observación y genera un movimiento `DIFERENCIA_CAJA` para cerrar la jornada en cero; resolver una diferencia genera un nuevo `AJUSTE`, nunca cambia la liquidación previa.
+Reglas (ADR 0009): el cobrador declara (jornada `PENDIENTE_LIQUIDACION`, liquidación `PENDIENTE_REVISION`) y el Admin confirma (liquidación `CUADRADA` o `CON_DIFERENCIA`, jornada `LIQUIDADA` o `LIQUIDADA_CON_DIFERENCIA`); `REVISADA` = el Admin resolvió la diferencia con un `AJUSTE`. Declarar no mueve dinero; al confirmar se transfiere a Caja Mayor el dinero **realmente entregado**; la diferencia se registra como `FALTANTE`/`SOBRANTE`, exige observación y genera un movimiento `DIFERENCIA_CAJA` para cerrar la jornada en cero; resolver una diferencia genera un nuevo `AJUSTE`, nunca cambia la liquidación previa. Corregir un pago de una jornada ya liquidada lo registra el Admin contra la Caja Mayor; la jornada no se reabre.
 Eventos: `JornadaAbierta`, `FondoOperativoTransferido`, `SaldoAperturaRegistrado`, `CapitalIngresado`, `GastoRegistrado`, `LiquidacionDeclarada`, `LiquidacionConfirmada`, `DiferenciaRegistrada`, `AjusteRegistrado`, `ReversoRegistrado`.
 
 Fórmulas:
