@@ -27,6 +27,8 @@ const e2eEnv = {
 
 export default defineConfig({
   testDir: "./src/tests/e2e",
+  // Con todos los recorridos en paralelo (y next dev compilando), los 5 s por defecto se quedan cortos.
+  expect: { timeout: 15_000 },
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
