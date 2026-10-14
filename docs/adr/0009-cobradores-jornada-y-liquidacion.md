@@ -23,6 +23,8 @@ F5 introduce al cobrador, sus rutas y asignaciones, la jornada de Caja Menor y l
 
 - Cobrador, ruta y asignación son tablas append-only con estado derivado de su par de fechas/eventos de cierre, igual que en F3/F4 (ningún hecho se edita).
 - Un cobro del cobrador se registra contra su jornada `ABIERTA` en la misma transacción que reduce la deuda (invariante de F5); el Admin sigue cobrando contra la Caja Mayor sin jornada. Las columnas nuevas (jornada, quién recibe) se añaden sin mutar los pagos de F4.
+- **Un solo libro para todas las cajas.** `cash_movements` es el libro de la Caja Mayor (sin `session_id`) y de cada Caja Menor (con `session_id`); cada caja tiene su saldo derivado y nunca negativo. El fondo operativo y la liquidación son dos movimientos espejo (uno por caja, mismo importe, verificado con un trigger diferido); la diferencia de caja vive solo en la jornada y la cierra en cero. Un cobro de cobrador es un `COBRO` de su jornada; el reverso va en la misma jornada mientras esté `ABIERTA`/`PENDIENTE_LIQUIDACION`.
+- Tablas: `cash_sessions` (jornada, una `ABIERTA`/`PENDIENTE` por cobrador), `settlements` (liquidación, confirmada una sola vez) y `settlement_resolutions` (el `AJUSTE` de la Mayor que la resuelve; `REVISADA` se deriva).
 - El cobrador accede por políticas/funciones propias filtradas por su asignación activa y su jornada; el resto de F4 sigue siendo solo para el Admin.
 
 ## Consecuencias

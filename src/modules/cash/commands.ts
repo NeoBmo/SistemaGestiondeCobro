@@ -243,7 +243,7 @@ export function reverseMovement(
       amount: string;
     }>(
       `select id, type, direction, amount::text as amount from public.cash_movements
-        where id = $1 and business_id = $2`,
+        where id = $1 and business_id = $2 and session_id is null`,
       [input.movementId, context.businessId],
     );
     const target = original.rows[0];

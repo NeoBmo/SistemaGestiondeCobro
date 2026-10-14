@@ -60,7 +60,7 @@ export async function getCashSummary(db: Db, actor: SessionContext): Promise<Cas
   const totals = await db.query<{ balance: string; opening: boolean }>(
     `select coalesce(sum(case direction when 'ENTRADA' then amount else -amount end), 0)::text as balance,
             coalesce(bool_or(type = 'SALDO_APERTURA'), false) as opening
-       from public.cash_movements where business_id = $1`,
+       from public.cash_movements where business_id = $1 and session_id is null`,
     [businessId],
   );
   const list = await db.query<MovementRow>(
@@ -71,7 +71,7 @@ export async function getCashSummary(db: Db, actor: SessionContext): Promise<Cas
        join public.profiles p on p.id = m.created_by
        left join public.expenses e on e.movement_id = m.id
        left join public.cash_movements r on r.reverses_movement_id = m.id
-      where m.business_id = $1
+      where m.business_id = $1 and m.session_id is null
       order by m.created_at desc, m.id desc
       limit $2`,
     [businessId, MOVEMENT_PAGE_SIZE + 1],
