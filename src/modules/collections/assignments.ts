@@ -2,7 +2,8 @@ import type { Pool } from "pg";
 import { recordAuditEvent } from "@/modules/audit/record-audit-event";
 import { authorizeBusinessAdmin } from "@/modules/identity/authorize-business-admin";
 import type { SessionContext } from "@/modules/identity/session";
-import { setLockTimeout, translateLockTimeout } from "@/shared/database/lock-timeout";
+import { setLockTimeout } from "@/shared/database/lock-timeout";
+import { translateCollectorError } from "./collectors";
 import { withTransaction } from "@/shared/database/with-transaction";
 import { AppError } from "@/shared/errors/app-error";
 import type { AssignClientInput } from "./validation";
@@ -105,6 +106,6 @@ export async function assignClient(
         409,
       );
     }
-    throw translateLockTimeout(error);
+    throw translateCollectorError(error);
   }
 }

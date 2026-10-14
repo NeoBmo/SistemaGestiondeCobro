@@ -259,6 +259,32 @@ describe("cobradores", () => {
     }
   });
 
+  it("un perfil bloqueado por otra vía no se desbloquea al restablecer y el reset audita sin contraseña y revoca sesiones", async () => {
+    const w = await world();
+    const c = await newCollector(w);
+    await signInWithUsername(
+      { supabase: createAnonClient(), db: pool, syntheticEmailDomain: TEST_EMAIL_DOMAIN },
+      { username: c.username, password: c.temporaryPassword },
+    );
+    const reset = await resetCollectorPassword(deps, w.actor, c.collectorId);
+    expect(
+      (await pool.query("select 1 from auth.sessions where user_id = $1", [c.userId])).rowCount,
+    ).toBe(0);
+    const events = await pool.query(
+      "select summary from public.audit_events where business_id = $1",
+      [w.businessId],
+    );
+    expect(JSON.stringify(events.rows)).not.toContain(reset.temporaryPassword);
+
+    await pool.query("update public.profiles set status = 'BLOQUEADO' where id = $1", [c.userId]);
+    expect(await failureOf(resetCollectorPassword(deps, w.actor, c.collectorId))).toMatchObject({
+      code: "USER_BLOCKED",
+      status: 409,
+    });
+    const status = await pool.query("select status from public.profiles where id = $1", [c.userId]);
+    expect(status.rows[0]!.status).toBe("BLOQUEADO");
+  });
+
   it("bajar de plan con más cobradores activos que el tope se rechaza con un 409 claro", async () => {
     const w = await world();
     for (let i = 0; i < 6; i++) await newCollector(w, `C${i}`);
@@ -435,6 +461,8 @@ describe("rutas y asignaciones", () => {
     ]);
 
     expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(2);
+    expect(await audit(w.businessId, "ClienteAsignado")).toHaveLength(1);
+    expect(await audit(w.businessId, "ClienteReasignado")).toHaveLength(1);
     const active = await pool.query(
       "select 1 from public.client_assignments where client_id = $1 and status = 'ACTIVA'",
       [client.id],

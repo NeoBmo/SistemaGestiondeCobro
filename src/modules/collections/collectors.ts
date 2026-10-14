@@ -63,6 +63,22 @@ export function translateCollectorError(error: unknown): unknown {
         409,
       );
     }
+    if (
+      message.includes("Solo se asigna a un cobrador ACTIVO") ||
+      message.includes("Solo se crea una ruta")
+    ) {
+      return new AppError("COLLECTOR_INACTIVE", "El cobrador está inactivo", 409);
+    }
+    if (message.includes("Solo se asigna a una ruta ACTIVA")) {
+      return new AppError("ROUTE_CLOSED", "La ruta está cerrada: elige una ruta activa", 409);
+    }
+    if (message.includes("aún tiene clientes asignados")) {
+      return new AppError(
+        "ROUTE_HAS_CLIENTS",
+        "La ruta aún tiene clientes asignados: reasígnalos antes de cerrarla",
+        409,
+      );
+    }
     if (message.includes("jornada")) {
       return new AppError(
         "COLLECTOR_HAS_OPEN_SESSION",
@@ -142,6 +158,7 @@ type LockedCollector = {
   name: string;
   status: "ACTIVO" | "INACTIVO";
   username: string;
+  profile_status: string;
 };
 
 async function lockCollector(
@@ -150,7 +167,7 @@ async function lockCollector(
   collectorId: string,
 ): Promise<LockedCollector> {
   const { rows } = await tx.query<LockedCollector>(
-    `select c.id, c.user_id, c.name, c.status, p.username
+    `select c.id, c.user_id, c.name, c.status, p.username, p.status as profile_status
        from public.collectors c join public.profiles p on p.id = c.user_id
       where c.id = $1 and c.business_id = $2 for update of c, p`,
     [collectorId, businessId],
@@ -172,6 +189,12 @@ async function revokeSessions(tx: Tx, userId: string): Promise<number | null> {
     return null;
   }
 }
+
+/*
+ * Auth y la BD no son atómicos (03 §3): `setTemporaryPassword` llama a Auth dentro de la transacción; si un
+ * paso posterior de la BD falla, se revierte la BD pero la contraseña de Auth ya cambió y queda desconocida
+ * para todos (lado seguro): el Admin repite el comando para obtener una nueva.
+ */
 
 /**
  * Desactivar = bloquear (ADR 0009): el cobrador queda `INACTIVO`, su cuenta `BLOQUEADA` y sus sesiones
@@ -274,6 +297,14 @@ export async function resetCollectorPassword(
         throw new AppError(
           "COLLECTOR_INACTIVE",
           "El cobrador está inactivo: reactívalo para darle una contraseña nueva",
+          409,
+        );
+      }
+      // Restablecer no desbloquea por la puerta de atrás: un perfil BLOQUEADO se trata aparte.
+      if (collector.profile_status === "BLOQUEADO") {
+        throw new AppError(
+          "USER_BLOCKED",
+          "La cuenta está bloqueada: restablecer la contraseña no la desbloquea",
           409,
         );
       }

@@ -2,7 +2,8 @@ import type { Pool } from "pg";
 import { recordAuditEvent } from "@/modules/audit/record-audit-event";
 import { authorizeBusinessAdmin } from "@/modules/identity/authorize-business-admin";
 import type { SessionContext } from "@/modules/identity/session";
-import { setLockTimeout, translateLockTimeout } from "@/shared/database/lock-timeout";
+import { setLockTimeout } from "@/shared/database/lock-timeout";
+import { translateCollectorError } from "./collectors";
 import { withTransaction } from "@/shared/database/with-transaction";
 import { localDateIn } from "@/shared/dates/dates";
 import { AppError } from "@/shared/errors/app-error";
@@ -70,7 +71,7 @@ export async function createRoute(
         409,
       );
     }
-    throw translateLockTimeout(error);
+    throw translateCollectorError(error);
   }
 }
 
@@ -118,6 +119,6 @@ export async function closeRoute(
       return { routeId };
     }, deps.db);
   } catch (error) {
-    throw translateLockTimeout(error);
+    throw translateCollectorError(error);
   }
 }

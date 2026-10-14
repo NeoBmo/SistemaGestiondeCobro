@@ -305,7 +305,10 @@ export async function changePlan(
       );
     } catch (error) {
       // El negocio tiene más cobradores activos que el tope del plan destino (ADR 0009): no se baja.
-      if ((error as { code?: string } | null)?.code === "23514") {
+      if (
+        (error as { code?: string } | null)?.code === "23514" &&
+        String((error as { message?: string }).message).includes("cobradores activos")
+      ) {
         throw new AppError(
           "COLLECTOR_LIMIT_EXCEEDED",
           "El negocio tiene más cobradores activos de los que admite ese plan: desactiva cobradores antes de bajar de plan",
