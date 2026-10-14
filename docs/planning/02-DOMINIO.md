@@ -187,6 +187,7 @@ Reglas:
 4. Se crea una liquidación interna sin efectivo que deja el préstamo anterior como `REFINANCIADO`.
 5. Si hay monto adicional, genera un desembolso separado desde Caja Mayor.
 6. El préstamo previo no se edita ni desaparece.
+7. El préstamo nuevo no se anula (ADR 0008): el anterior ya quedó `REFINANCIADO` y se perdería la deuda.
 Eventos: `RefinanciacionCreada`, `SaldoAnteriorRefinanciado`, `MontoAdicionalDesembolsado`.
 
 ---

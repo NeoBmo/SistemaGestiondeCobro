@@ -326,7 +326,7 @@ export function annulContract(
       }
 
       // El préstamo que nace de una refinanciación no se anula: dejaría al cliente sin deuda en ningún
-      // préstamo (el anterior sigue REFINANCIADO). Qué hacer en ese caso está pendiente (05-PENDIENTES).
+      // préstamo (el anterior sigue REFINANCIADO). Decisión del dueño: nunca se anula (ADR 0008).
       if (loan.previous_loan_id) {
         throw new AppError(
           "LOAN_FROM_REFINANCING",

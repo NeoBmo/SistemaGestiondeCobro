@@ -13,6 +13,7 @@ F4 registra pagos y cierra el ciclo de la deuda. `02` fija la aplicación cronol
 - **Reverso solo del último pago.** Un pago se reversa únicamente si es el más reciente no reversado de su préstamo; para reversar uno anterior se reversan antes los posteriores. No hay reaplicaciones: cada reverso restaura exactamente lo que aplicó su pago.
 - **Topes separados.** Un pago de cuotas no puede superar el saldo pendiente de las cuotas (no incluye mora); un pago de cargo de mora no puede superar el saldo de ese cargo. No hay saldos a favor. El préstamo está `PAGADO` solo con cuotas y cargos activos en cero.
 - **Refinanciación sin mora pendiente.** El saldo refinanciado es solo el saldo pendiente de las cuotas. Si el préstamo tiene cargos de mora `ACTIVO` con saldo, la refinanciación se rechaza hasta que se paguen o se anulen (con motivo).
+- **El préstamo nacido de una refinanciación no se anula** (decisión del dueño, 2026-10-13). Anularlo dejaría al cliente sin deuda en ningún préstamo, porque el anterior sigue `REFINANCIADO`. Un error se corrige reversando sus pagos y, si hace falta, ajustando; `annulContract` lo rechaza con 409 `LOAN_FROM_REFINANCING`.
 
 ## Forma técnica
 
