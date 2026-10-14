@@ -163,4 +163,53 @@ describe("concurrencia de cobradores, rutas y asignaciones", () => {
     );
     expect(state.rows[0]!.status).toBe("ACTIVO");
   });
+
+  it("un cobro contra la declaración simultánea de la jornada: no se cobra en una jornada ya pendiente", async () => {
+    const w = await world();
+    const collectorId = await w.collector();
+    const collectorUser = (
+      await pool.query<{ user_id: string }>("select user_id from public.collectors where id = $1", [
+        collectorId,
+      ])
+    ).rows[0]!.user_id;
+    const session = (
+      await pool.query<{ id: string }>(
+        "insert into public.cash_sessions (business_id, collector_id, business_date) values ($1, $2, current_date) returning id",
+        [w.businessId, collectorId],
+      )
+    ).rows[0]!.id;
+    const box = (
+      await pool.query<{ id: string }>(
+        "select id from public.main_cashboxes where business_id = $1",
+        [w.businessId],
+      )
+    ).rows[0]!.id;
+
+    const outcome = await race(
+      async (a) => {
+        await a.query(
+          "insert into public.settlements (business_id, session_id, collector_id, declared_amount, declared_by) values ($1, $2, $3, 0, $4)",
+          [w.businessId, session, collectorId, collectorUser],
+        );
+        await a.query(
+          "update public.cash_sessions set status = 'PENDIENTE_LIQUIDACION', declared_at = now() where id = $1",
+          [session],
+        );
+      },
+      (b) =>
+        b.query(
+          `insert into public.cash_movements (business_id, cashbox_id, session_id, type, direction, amount, created_by)
+           values ($1, $2, $3, 'COBRO', 'ENTRADA', 10, $4)`,
+          [w.businessId, box, session, collectorUser],
+        ),
+    );
+
+    expect(outcome.ok).toBe(false);
+    expect(outcome.code).toBe(CHECK_VIOLATION);
+    const movements = await pool.query(
+      "select 1 from public.cash_movements where session_id = $1",
+      [session],
+    );
+    expect(movements.rowCount).toBe(0);
+  });
 });

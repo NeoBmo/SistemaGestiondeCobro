@@ -162,6 +162,9 @@ export class TestFixtures {
       await client.query("alter table public.audit_events enable trigger append_only_row");
       // Los hechos de caja son de solo agregado: igual que con la auditoría, se desactiva el trigger solo aquí.
       const ledger = [
+        "settlement_resolutions",
+        "settlements",
+        "cash_sessions",
         "client_assignments",
         "routes",
         "collectors",
@@ -183,9 +186,8 @@ export class TestFixtures {
         await client.query(`alter table public.${table} disable trigger append_only_row`);
       }
       for (const table of [
-        "client_assignments",
-        "routes",
-        "collectors",
+        "settlement_resolutions",
+        "settlements",
         "refinancings",
         "payment_reversals",
         "payment_applications",
@@ -206,6 +208,11 @@ export class TestFixtures {
       await client.query("delete from public.cash_movements where business_id = any($1)", [
         this.businessIds,
       ]);
+      for (const table of ["cash_sessions", "client_assignments", "routes", "collectors"]) {
+        await client.query(`delete from public.${table} where business_id = any($1)`, [
+          this.businessIds,
+        ]);
+      }
       await client.query("delete from public.idempotency_keys where business_id = any($1)", [
         this.businessIds,
       ]);
