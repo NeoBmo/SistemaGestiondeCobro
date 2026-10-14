@@ -295,13 +295,28 @@ export async function changePlan(
       startsOn: today,
       expiresOn: subscriptionExpiry(planCode, today),
     };
-    await tx.query(
-      `update public.subscriptions
-          set plan_code = $2, starts_on = $3, expires_on = $4,
-              note = coalesce($5, note), changed_by = $6, updated_at = now()
-        where id = $1`,
-      [before.id, after.planCode, after.startsOn, after.expiresOn, note ?? null, actor.userId],
-    );
+    try {
+      await tx.query(
+        `update public.subscriptions
+            set plan_code = $2, starts_on = $3, expires_on = $4,
+                note = coalesce($5, note), changed_by = $6, updated_at = now()
+          where id = $1`,
+        [before.id, after.planCode, after.startsOn, after.expiresOn, note ?? null, actor.userId],
+      );
+    } catch (error) {
+      // El negocio tiene más cobradores activos que el tope del plan destino (ADR 0009): no se baja.
+      if (
+        (error as { code?: string } | null)?.code === "23514" &&
+        String((error as { message?: string }).message).includes("cobradores activos")
+      ) {
+        throw new AppError(
+          "COLLECTOR_LIMIT_EXCEEDED",
+          "El negocio tiene más cobradores activos de los que admite ese plan: desactiva cobradores antes de bajar de plan",
+          409,
+        );
+      }
+      throw error;
+    }
 
     await recordAuditEvent(tx, {
       businessId: input.businessId,
