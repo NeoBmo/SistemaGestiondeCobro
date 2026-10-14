@@ -94,3 +94,31 @@ export const fundSchema = z.object({
   sessionId: z.uuid(),
   amount: z.number().int().positive().max(1_000_000_000_000),
 });
+
+const settlementNote = z
+  .string()
+  .trim()
+  .refine((value) => !value.includes("\0"), "La observación no puede contener el carácter nulo")
+  .pipe(z.string().max(500))
+  .transform((value) => value || undefined)
+  .optional();
+
+/** El cobrador declara cuánto entrega al cerrar su jornada (02 §5.5); cero es válido. */
+export const declareSettlementSchema = z.object({
+  declaredAmount: z.number().int().min(0).max(1_000_000_000_000),
+});
+
+/** El Admin confirma con lo que realmente recibió; si no coincide con lo esperado, la observación es obligatoria. */
+export const confirmSettlementSchema = z.object({
+  receivedAmount: z.number().int().min(0).max(1_000_000_000_000),
+  observation: settlementNote,
+});
+
+/** Resolver una diferencia registra su motivo; el importe y la dirección salen de la propia diferencia. */
+export const resolveDifferenceSchema = z.object({
+  note: z
+    .string()
+    .trim()
+    .refine((value) => !value.includes("\0"), "El motivo no puede contener el carácter nulo")
+    .pipe(z.string().min(1, "El motivo es obligatorio").max(500)),
+});
