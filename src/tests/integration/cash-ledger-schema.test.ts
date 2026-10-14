@@ -173,7 +173,10 @@ describe("solo agregado", () => {
       }
 
       expect(
-        await attempt(client, "update public.idempotency_keys set result = '{\"ok\":true}'"),
+        await attempt(
+          client,
+          `update public.idempotency_keys set result = '{"ok":true}' where business_id = '${s.a}'`,
+        ),
       ).toBeNull();
     });
   });
@@ -402,10 +405,18 @@ describe("coherencia gasto ↔ movimiento y autoría", () => {
         [s.a],
       );
       expect(
-        await attempt(client, "update public.idempotency_keys set result = '{\"n\":1}'"),
+        await attempt(
+          client,
+          `update public.idempotency_keys set result = '{"n":1}' where business_id = '${s.a}'`,
+        ),
       ).toBeNull();
       expect(
-        (await attempt(client, "update public.idempotency_keys set result = '{\"n\":2}'"))?.code,
+        (
+          await attempt(
+            client,
+            `update public.idempotency_keys set result = '{"n":2}' where business_id = '${s.a}'`,
+          )
+        )?.code,
       ).toBe(RESTRICT_VIOLATION);
     });
   });
