@@ -33,10 +33,12 @@ export type MovementResult = {
 type Base = { idempotencyKey: IdempotencyKey };
 type Direction = "ENTRADA" | "SALIDA";
 
-const insufficientFunds = () =>
+const insufficientFunds = (inSession = false) =>
   new AppError(
     "INSUFFICIENT_FUNDS",
-    "La Caja Mayor no tiene saldo suficiente para esta operación",
+    inSession
+      ? "La Caja Menor de la jornada no tiene saldo suficiente para esta operación"
+      : "La Caja Mayor no tiene saldo suficiente para esta operación",
     409,
   );
 
@@ -48,6 +50,10 @@ type MovementInsert = {
   note?: string | null;
   reverses?: string | null;
   reference?: { type: string; id: string };
+  /** Caja Menor de esta jornada; sin ella el movimiento es de la Caja Mayor. */
+  sessionId?: string | null;
+  /** Autor del movimiento si no es el actor del comando (p. ej. el cobrador de la jornada). */
+  createdBy?: string;
 };
 
 export async function insertMovement(
@@ -55,14 +61,15 @@ export async function insertMovement(
   context: CashCommandContext,
   movement: MovementInsert,
 ): Promise<{ id: string; balance: Money }> {
-  const before = await getCashboxBalance(tx, context.cashboxId);
-  if (movement.direction === "SALIDA" && before < movement.amount) throw insufficientFunds();
+  const before = await getCashboxBalance(tx, context.cashboxId, movement.sessionId ?? null);
+  if (movement.direction === "SALIDA" && before < movement.amount)
+    throw insufficientFunds(Boolean(movement.sessionId));
 
   const { rows } = await tx.query<{ id: string }>(
     `insert into public.cash_movements
        (business_id, cashbox_id, type, direction, amount, reason, note, reverses_movement_id,
-        reference_type, reference_id, created_by)
-     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) returning id`,
+        reference_type, reference_id, created_by, session_id)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) returning id`,
     [
       context.businessId,
       context.cashboxId,
@@ -74,7 +81,8 @@ export async function insertMovement(
       movement.reverses ?? null,
       movement.reference?.type ?? null,
       movement.reference?.id ?? null,
-      context.actorId,
+      movement.createdBy ?? context.actorId,
+      movement.sessionId ?? null,
     ],
   );
   const balance =
