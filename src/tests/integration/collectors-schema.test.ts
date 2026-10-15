@@ -400,8 +400,8 @@ describe("fechas de cierre y suscripción", () => {
       );
 
       for (const statement of [
-        "update public.routes set closed_at = now() + interval '1 day'",
-        "update public.client_assignments set ended_at = now() + interval '1 day'",
+        `update public.routes set closed_at = now() + interval '1 day' where id = '${routeId}'`,
+        `update public.client_assignments set ended_at = now() + interval '1 day' where route_id = '${routeId}'`,
       ]) {
         expect((await attempt(client, statement))?.code, statement).toBe(RESTRICT_VIOLATION);
       }

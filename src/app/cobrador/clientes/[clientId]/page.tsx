@@ -42,6 +42,7 @@ export default async function CollectorClientPage({
   if (!timeZone) throw new Error("El cobrador no tiene zona horaria");
   const { client } = detail;
   const whatsappDigits = client.whatsapp?.replace(/\D/g, "") ?? "";
+  const phoneLink = client.phone?.replace(/[^+\d]/g, "") ?? "";
 
   return (
     <CashFeedbackProvider>
@@ -53,8 +54,8 @@ export default async function CollectorClientPage({
       {client.address ? <p className="mt-1 text-sm break-words">{client.address}</p> : null}
 
       <div className="mt-3 flex flex-wrap gap-2" aria-label="Contactar">
-        {client.phone ? (
-          <a href={`tel:${client.phone}`} className={linkClass}>
+        {phoneLink ? (
+          <a href={`tel:${phoneLink}`} className={linkClass}>
             Llamar
           </a>
         ) : null}
@@ -121,7 +122,7 @@ export default async function CollectorClientPage({
                 ))}
             </ol>
             <div className="mt-4">
-              {detail.hasOpenSession ? (
+              {detail.sessionStatus === "ABIERTA" ? (
                 <RegisterPayment
                   url="/api/cobrador/pagos"
                   loanId={loan.loanId}
@@ -132,7 +133,11 @@ export default async function CollectorClientPage({
                   lateFees={loan.lateFees}
                 />
               ) : (
-                <Alert variant="info">Abre tu jornada para registrar cobros de este cliente.</Alert>
+                <Alert variant="info">
+                  {detail.sessionStatus === "PENDIENTE_LIQUIDACION"
+                    ? "Tu entrega está pendiente de confirmación: no se registran más cobros en esa jornada."
+                    : "Abre tu jornada para registrar cobros de este cliente."}
+                </Alert>
               )}
             </div>
           </section>

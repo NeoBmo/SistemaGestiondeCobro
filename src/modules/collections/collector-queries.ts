@@ -140,7 +140,7 @@ export async function getCollectorHome(
        left join public.loans l on l.contract_id = k.id and l.status = 'ACTIVO'
        left join public.installments i on i.loan_id = l.id
        left join lateral (select i.amount - private.installment_applied(i.id) as pending) p on i.id is not null
-      where a.collector_id = $1 and a.business_id = $3 and a.status = 'ACTIVA'
+      where a.collector_id = $1 and a.business_id = $3 and a.status = 'ACTIVA' and cl.business_id = $3
       group by cl.id`,
     [collector.id, today, collector.business_id],
   );
@@ -208,7 +208,8 @@ export type CollectorClientDetail = {
     retryAt: Date | null;
     createdAt: Date;
   }[];
-  hasOpenSession: boolean;
+  /** Jornada abierta o pendiente de liquidación del cobrador, si la hay. */
+  sessionStatus: "ABIERTA" | "PENDIENTE_LIQUIDACION" | null;
 };
 
 /** El cliente solo si está asignado ahora al cobrador; si no, `null` («no encontrado»). */
@@ -302,8 +303,8 @@ export async function getCollectorClient(
       where client_id = $1 and collector_id = $2 order by created_at desc, id limit 10`,
     [clientId, collector.id],
   );
-  const open = await db.query(
-    "select 1 from public.cash_sessions where collector_id = $1 and status = 'ABIERTA'",
+  const open = await db.query<{ status: "ABIERTA" | "PENDIENTE_LIQUIDACION" }>(
+    "select status from public.cash_sessions where collector_id = $1 and status in ('ABIERTA', 'PENDIENTE_LIQUIDACION')",
     [collector.id],
   );
 
@@ -318,6 +319,6 @@ export async function getCollectorClient(
       retryAt: row.retry_at,
       createdAt: row.created_at,
     })),
-    hasOpenSession: (open.rowCount ?? 0) > 0,
+    sessionStatus: open.rows[0]?.status ?? null,
   };
 }

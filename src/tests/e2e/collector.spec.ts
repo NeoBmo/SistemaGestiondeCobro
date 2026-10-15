@@ -106,7 +106,7 @@ test("el cobrador abre su jornada, cobra, registra una visita y un gasto y entre
   // El Admin le transfiere fondo.
   const sessionId = (
     await pool.query<{ id: string }>(
-      "select id from public.cash_sessions where business_id = (select business_id from public.profiles where id = $1)",
+      "select s.id from public.cash_sessions s join public.collectors c on c.id = s.collector_id where c.user_id = $1",
       [s.collectorAccount.userId],
     )
   ).rows[0]!.id;
@@ -145,8 +145,9 @@ test("el cobrador abre su jornada, cobra, registra una visita y un gasto y entre
   // Gasto y entrega: debe tener 100.000 + 75.000 − 20.000 = 155.000 y declara menos.
   await page.goto("/cobrador");
   await page.getByRole("button", { name: "Registrar gasto" }).click();
-  await page.getByLabel(/^Monto \(pesos\)/).fill("20000");
-  await page.getByRole("button", { name: "Registrar gasto", exact: true }).last().click();
+  const expenseForm = page.getByRole("form", { name: "Registrar gasto" });
+  await expenseForm.getByLabel(/^Monto \(pesos\)/).fill("20000");
+  await expenseForm.getByRole("button", { name: "Registrar gasto" }).click();
   await expect(page.getByText(/Gasto registrado\. Debes tener \$155\.000/)).toBeVisible();
   await page.getByRole("button", { name: "Entregar y cerrar jornada" }).click();
   await page.getByLabel(/^Dinero que entregas/).fill("150000");
