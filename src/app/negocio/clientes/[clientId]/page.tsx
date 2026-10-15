@@ -2,10 +2,13 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getPageSession } from "@/modules/identity/page-session";
+import { getClientAssignment, listAssignableRoutes } from "@/modules/collections/queries";
 import { getClientDetail } from "@/modules/portfolio/client-queries";
 import { getPool } from "@/shared/database/pg-pool";
 import { formatIsoDate } from "@/shared/dates/dates";
 import { formatMoney } from "@/shared/money/money";
+import { CashFeedbackProvider } from "../../_components/cash-feedback";
+import { AssignClientForm } from "../../rutas/_components/route-forms";
 import { ClientForm } from "../_components/client-form";
 
 export const metadata: Metadata = { title: "Cliente" };
@@ -22,6 +25,11 @@ export default async function ClientPage({ params }: { params: Promise<{ clientI
   const detail = await getClientDetail(getPool(), session, clientId);
   if (!detail) notFound();
   const { client, loans } = detail;
+  const db = getPool();
+  const [assignment, routes] = await Promise.all([
+    getClientAssignment(db, session, client.id),
+    listAssignableRoutes(db, session),
+  ]);
 
   return (
     <>
@@ -78,6 +86,31 @@ export default async function ClientPage({ params }: { params: Promise<{ clientI
             ))}
           </ul>
         )}
+      </section>
+
+      <section aria-labelledby="cartera" className="mt-8">
+        <h2 id="cartera" className="text-xl font-semibold">
+          Ruta de cobro
+        </h2>
+        <p className="mt-2 text-sm" data-testid="asignacion">
+          {assignment ? (
+            <>
+              Asignado a la ruta <span className="font-medium">{assignment.routeName}</span> de{" "}
+              <span className="font-medium">{assignment.collectorName}</span>.
+            </>
+          ) : (
+            "Este cliente no está asignado a ninguna ruta."
+          )}
+        </p>
+        <div className="mt-3">
+          <CashFeedbackProvider>
+            <AssignClientForm
+              clientId={client.id}
+              routes={routes}
+              currentRouteId={assignment?.routeId ?? null}
+            />
+          </CashFeedbackProvider>
+        </div>
       </section>
 
       <section aria-labelledby="contacto" className="mt-8">

@@ -36,6 +36,33 @@ export default async function NegocioPage() {
       </section>
 
       <section
+        aria-labelledby="cobranza"
+        className="border-border mt-4 max-w-md rounded-lg border p-4"
+      >
+        <h2 id="cobranza" className="text-lg font-medium">
+          Cobranza
+        </h2>
+        <p className="text-muted mt-1 text-sm">
+          Cobradores, rutas, fondo de cada jornada y liquidaciones.
+        </p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {[
+            ["/negocio/cobradores", "Cobradores"],
+            ["/negocio/rutas", "Rutas"],
+            ["/negocio/jornadas", "Jornadas"],
+          ].map(([href, label]) => (
+            <Link
+              key={href}
+              href={href!}
+              className="border-border bg-background hover:bg-surface inline-flex min-h-11 items-center rounded-lg border px-4 font-medium"
+            >
+              {label}
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      <section
         aria-labelledby="clientes"
         className="border-border mt-4 max-w-md rounded-lg border p-4"
       >
