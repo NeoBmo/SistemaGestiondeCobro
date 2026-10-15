@@ -70,6 +70,7 @@ export default async function NegocioPage() {
             ["/negocio/rutas", "Rutas"],
             ["/negocio/jornadas", "Jornadas"],
             ["/negocio/cartera", "Cartera"],
+            ["/negocio/soporte", "Soporte"],
           ].map(([href, label]) => (
             <Link
               key={href}

@@ -62,6 +62,9 @@ export type BusinessSummary = {
   status: SubscriptionStatus;
   expiresOn: IsoDate;
   adminUsername: string | null;
+  /** Tope de cobradores activos del plan (`null` = sin límite práctico) y cuántos hay activos. */
+  collectorLimit: number | null;
+  activeCollectors: number;
 };
 
 type SummaryRow = {
@@ -75,6 +78,8 @@ type SummaryRow = {
   status: StoredSubscriptionStatus;
   expires_on: string;
   admin_username: string | null;
+  collector_limit: number | null;
+  active_collectors: string;
 };
 
 /**
@@ -92,7 +97,9 @@ export async function listBusinesses(
   const { rows } = await db.query<SummaryRow>(
     `select b.id, b.name, b.owner_name, b.time_zone, b.access_status,
             s.plan_code, p.name as plan_name, s.status, s.expires_on::text as expires_on,
-            a.username as admin_username
+            a.username as admin_username, p.max_active_collectors as collector_limit,
+            (select count(*) from public.collectors c
+              where c.business_id = b.id and c.status = 'ACTIVO')::text as active_collectors
        from public.businesses b
        cross join lateral (
          select s.plan_code, s.status, s.expires_on
@@ -128,6 +135,8 @@ export async function listBusinesses(
       ),
       expiresOn,
       adminUsername: row.admin_username,
+      collectorLimit: row.collector_limit,
+      activeCollectors: Number(row.active_collectors),
     };
   });
   return filters.status ? summaries.filter((b) => b.status === filters.status) : summaries;

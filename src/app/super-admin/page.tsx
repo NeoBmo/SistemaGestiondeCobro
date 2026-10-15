@@ -128,6 +128,13 @@ export default async function SuperAdminPage({
                 <dd className="text-foreground">{business.planName}</dd>
                 <dt>Vence</dt>
                 <dd className="text-foreground">{formatIsoDate(business.expiresOn)}</dd>
+                <dt>Cobradores</dt>
+                <dd className="text-foreground" data-testid="cobradores">
+                  {business.activeCollectors} activos
+                  {business.collectorLimit === null
+                    ? " (sin límite)"
+                    : ` de ${business.collectorLimit}`}
+                </dd>
                 <dt>Administrador</dt>
                 <dd className="text-foreground">{business.adminUsername ?? "—"}</dd>
               </dl>
