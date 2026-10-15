@@ -68,7 +68,7 @@ test("el Admin crea un cobrador y su ruta, asigna un cliente, da fondo y confirm
   // Asignación desde la ficha del cliente.
   await page.goto(`/negocio/clientes/${client.id}`);
   await expect(page.getByTestId("asignacion")).toContainText("no está asignado");
-  await page.getByRole("button", { name: "Asignar" }).click();
+  await page.getByRole("button", { name: "Asignar", exact: true }).click();
   await expect(page.getByTestId("asignacion")).toContainText("Ruta Norte");
 
   // Jornada: la abre el cobrador (servicio) y el Admin le transfiere fondo.
@@ -100,7 +100,6 @@ test("el Admin crea un cobrador y su ruta, asigna un cliente, da fondo y confirm
   await page.getByRole("button", { name: "Confirmar liquidación" }).click();
   await page.getByLabel(/^Dinero recibido/).fill("90000");
   await page.getByRole("button", { name: "Confirmar", exact: true }).click();
-  await expect(page.getByLabel("Observación")).toBeVisible();
   await expect(page.locator("main").getByRole("alert")).toContainText("observación");
   await page.getByLabel("Observación").fill("Faltaron 10.000");
   await page.getByRole("button", { name: "Confirmar", exact: true }).click();
@@ -117,6 +116,7 @@ test("el Admin crea un cobrador y su ruta, asigna un cliente, da fondo y confirm
   await expect(page.getByTestId("saldo")).toHaveText("$1.000.000");
 
   // Mobile-first: sin desbordes horizontales.
+  await page.setViewportSize({ width: 360, height: 740 });
   await page.goto("/negocio/jornadas");
   const overflow = await page.evaluate(
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,

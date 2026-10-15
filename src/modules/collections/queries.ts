@@ -249,7 +249,10 @@ export async function listSessions(db: Db, actor: SessionContext): Promise<Sessi
              - coalesce(sum(m.amount) filter (where m.type = 'REVERSO' and m.direction = 'SALIDA'
                           and exists (select 1 from public.cash_movements o
                                        where o.id = m.reverses_movement_id and o.type = 'COBRO')), 0))::text as collected,
-            (coalesce(sum(m.amount) filter (where m.type = 'GASTO_COBRADOR'), 0))::text as spent,
+            (coalesce(sum(m.amount) filter (where m.type = 'GASTO_COBRADOR'), 0)
+             - coalesce(sum(m.amount) filter (where m.type = 'REVERSO' and m.direction = 'ENTRADA'
+                          and exists (select 1 from public.cash_movements o
+                                       where o.id = m.reverses_movement_id and o.type = 'GASTO_COBRADOR')), 0))::text as spent,
             coalesce(sum(case when m.type in ('LIQUIDACION', 'DIFERENCIA_CAJA') then 0
                               when m.direction = 'ENTRADA' then m.amount else -m.amount end), 0)::text as expected,
             st.id as settlement_id, st.status as settlement_status, st.declared_amount::text,
