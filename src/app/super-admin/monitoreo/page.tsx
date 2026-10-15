@@ -14,7 +14,7 @@ export const metadata: Metadata = { title: "Monitoreo" };
 const BACKUP_ALERT = {
   SIN_REGISTRO: "Todavía no hay ninguna verificación de backup registrada.",
   FALLO: "La última verificación de backup falló.",
-  VENCIDO: "Pasó más de un día sin verificar el backup.",
+  VENCIDO: "Pasó más de un día sin verificar el backup (se espera una verificación diaria).",
   INCOMPLETO: "No hay una verificación correcta por cada uno de los últimos 7 días.",
 } as const;
 
@@ -98,7 +98,7 @@ export default async function MonitoringPage() {
         ) : (
           <ul className="mt-2 flex flex-col gap-1 text-sm">
             {data.recentErrors.map((error) => (
-              <li key={`${error.route}-${error.occurredAt.toISOString()}`}>
+              <li key={error.id}>
                 {when(error.occurredAt)} · <span className="font-mono">{error.route}</span>
                 {error.errorName ? ` · ${error.errorName}` : ""}
               </li>

@@ -39,7 +39,7 @@ export type PlatformIndicators = {
   /** Chequeos fallidos de las últimas 24 h, los más recientes primero. */
   interruptions: { checkedAt: Date; databaseOk: boolean; authOk: boolean; latencyMs: number }[];
   errors24h: number;
-  recentErrors: { route: string; errorName: string | null; occurredAt: Date }[];
+  recentErrors: { id: string; route: string; errorName: string | null; occurredAt: Date }[];
   backup: BackupStatus;
   tickets: OpenTicketCounts;
   subscriptions: {
@@ -69,7 +69,8 @@ async function window(db: Db, now: Date, hours: number): Promise<AvailabilityWin
   const checks = Number(row.checks);
   return {
     checks,
-    availability: checks === 0 ? null : Math.round((Number(row.ok) / checks) * 1000) / 10,
+    // Se trunca (no se redondea): 99,95 % no debe mostrarse como 100 % si hubo un chequeo fallido.
+    availability: checks === 0 ? null : Math.floor((Number(row.ok) / checks) * 1000) / 10,
     averageLatencyMs: row.average === null ? null : Math.round(Number(row.average)),
     p95LatencyMs: row.p95 === null ? null : Math.round(row.p95),
   };
@@ -102,8 +103,8 @@ export async function getPlatformIndicators(
           where occurred_at > $1::timestamptz - interval '24 hours' and occurred_at <= $1::timestamptz`,
         [at],
       ),
-      db.query<{ route: string; error_name: string | null; occurred_at: Date }>(
-        `select route, error_name, occurred_at from public.platform_events
+      db.query<{ id: string; route: string; error_name: string | null; occurred_at: Date }>(
+        `select id, route, error_name, occurred_at from public.platform_events
           where occurred_at <= $1::timestamptz order by occurred_at desc limit 10`,
         [at],
       ),
@@ -159,6 +160,7 @@ export async function getPlatformIndicators(
     })),
     errors24h: Number(errors.rows[0]!.n),
     recentErrors: recent.rows.map((row) => ({
+      id: row.id,
       route: row.route,
       errorName: row.error_name,
       occurredAt: row.occurred_at,
