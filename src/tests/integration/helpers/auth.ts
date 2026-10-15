@@ -153,39 +153,15 @@ export class TestFixtures {
     const client = await this.pool.connect();
     try {
       await client.query("begin");
-      await client.query("alter table public.audit_events disable trigger append_only_row");
+      // Sin disparadores en esta transacción (los de solo agregado y las claves foráneas): evita `alter table`,
+      // que bloquea tablas enteras y provocaba interbloqueos con otras pruebas que escriben a la vez.
+      await client.query("set local session_replication_role = replica");
       await client.query(
         `delete from public.audit_events
           where actor_id = any($1) or business_id = any($2) or entity_id = any($1) or entity_id = any($2)`,
         [this.userIds, this.businessIds],
       );
-      await client.query("alter table public.audit_events enable trigger append_only_row");
       // Los hechos de caja son de solo agregado: igual que con la auditoría, se desactiva el trigger solo aquí.
-      const ledger = [
-        "collection_attempts",
-        "settlement_resolutions",
-        "settlements",
-        "cash_sessions",
-        "client_assignments",
-        "routes",
-        "collectors",
-        "refinancings",
-        "payment_reversals",
-        "payment_applications",
-        "payments",
-        "late_fee_voids",
-        "late_fee_charges",
-        "installments",
-        "loans",
-        "contracts",
-        "expenses",
-        "cash_movements",
-        "idempotency_keys",
-        "main_cashboxes",
-      ];
-      for (const table of ledger) {
-        await client.query(`alter table public.${table} disable trigger append_only_row`);
-      }
       for (const table of [
         "settlement_resolutions",
         "settlements",
@@ -230,14 +206,9 @@ export class TestFixtures {
       await client.query("delete from public.contract_counters where business_id = any($1)", [
         this.businessIds,
       ]);
-      await client.query("alter table public.clients disable trigger clients_protect_identity");
       await client.query("delete from public.clients where business_id = any($1)", [
         this.businessIds,
       ]);
-      await client.query("alter table public.clients enable trigger clients_protect_identity");
-      for (const table of ledger) {
-        await client.query(`alter table public.${table} enable trigger append_only_row`);
-      }
       // Las suscripciones primero: `changed_by` apunta a perfiles (p. ej. el Super Admin de la prueba).
       await client.query("delete from public.subscriptions where business_id = any($1)", [
         this.businessIds,

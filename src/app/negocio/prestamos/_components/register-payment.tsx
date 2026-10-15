@@ -24,6 +24,8 @@ type Registered = {
 };
 
 type Props = {
+  /** Ruta del comando: el Admin cobra contra la Caja Mayor y el cobrador contra su jornada. */
+  url?: string;
   loanId: string;
   installments: { number: number; pendingAmount: number }[];
   /** Cargos de mora activos con saldo (se pagan de forma explícita, 02 §3.1). */
@@ -37,10 +39,15 @@ const CUOTAS = "CUOTAS";
  * primero, el excedente a la siguiente, sin saldo a favor); la aplicación real y su resultado verificable
  * los devuelve el servidor y se anuncian en la región compartida.
  */
-export function RegisterPayment({ loanId, installments, lateFees }: Props) {
+export function RegisterPayment({
+  url = "/api/negocio/pagos",
+  loanId,
+  installments,
+  lateFees,
+}: Props) {
   const router = useRouter();
   const feedback = useCashFeedback();
-  const { state, run, reset } = useCommand<Registered>("/api/negocio/pagos");
+  const { state, run, reset } = useCommand<Registered>(url);
   const [idempotency] = useState(() => createIdempotencyKeyHolder());
   const [target, setTarget] = useState<string>(CUOTAS);
   const [amountText, setAmountText] = useState("");

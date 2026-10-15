@@ -22,6 +22,7 @@ export type CommandField =
       maxLength?: number;
     }
   | { kind: "textarea"; name: string; label: string; required?: boolean; hint?: string }
+  | { kind: "datetime"; name: string; label: string; required?: boolean; hint?: string }
   | {
       kind: "amount";
       name: string;
@@ -120,6 +121,11 @@ export function CommandForm<T>({
           field.allowZero && raw === "0" ? { ok: true as const, amount: 0 } : parseAmountInput(raw);
         if (!parsed.ok) next[field.name] = parsed.message;
         else body[field.name] = parsed.amount;
+      } else if (field.kind === "datetime" && raw !== "") {
+        // El navegador da la hora local sin zona: se envía como instante (ISO con zona).
+        const date = new Date(raw);
+        if (Number.isNaN(date.getTime())) next[field.name] = `${field.label}: fecha no válida.`;
+        else body[field.name] = date.toISOString();
       } else if (raw === "") {
         if (field.required) next[field.name] = `${field.label}: es obligatorio.`;
       } else {
@@ -198,6 +204,7 @@ export function CommandForm<T>({
             required={field.required}
             readOnly={busy}
             autoComplete="off"
+            type={field.kind === "datetime" ? "datetime-local" : undefined}
             inputMode={field.kind === "amount" ? "numeric" : undefined}
             maxLength={field.kind === "text" ? field.maxLength : undefined}
             hint={field.hint}
