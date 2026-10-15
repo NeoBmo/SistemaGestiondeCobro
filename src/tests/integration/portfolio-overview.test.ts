@@ -14,7 +14,7 @@ import { loadSessionContext, type SessionContext } from "@/modules/identity/sess
 import { createClient } from "@/modules/portfolio/clients";
 import { confirmContract } from "@/modules/portfolio/contracts";
 import { getLoanDetail } from "@/modules/portfolio/loan-queries";
-import { registerPayment } from "@/modules/portfolio/payments";
+import { registerPayment, reversePayment } from "@/modules/portfolio/payments";
 import { refinanceLoan } from "@/modules/portfolio/refinancing";
 import { addDays, isoDate, localDateIn } from "@/shared/dates/dates";
 import type { IdempotencyKey } from "@/shared/ids/idempotency-key";
@@ -236,6 +236,32 @@ describe("historial de comportamiento", () => {
     });
     const page = await listPortfolio(pool, w.actor, filters());
     expect(page.rows[0]).toMatchObject({ status: "AL_DIA", overdue: 0, totalPending: 330_000 });
+  });
+
+  it("un pago reversado no cuenta como pagado y el cliente con todo pagado sigue en la cartera", async () => {
+    const w = await business();
+    const c = await client(w, "Reversado");
+    const loanId = await loan(w, c.id, { principal: 100_000, installments: 1, firstOffset: 2 });
+    const paid = await registerPayment(deps, w.actor, {
+      idempotencyKey: key(),
+      loanId,
+      amount: 100_000,
+    });
+    // Pagado por completo: no es mora ni deuda, pero el cliente sigue listado (su préstamo sigue activo).
+    let page = await listPortfolio(pool, w.actor, filters());
+    expect(page.rows).toHaveLength(1);
+    expect(page.rows[0]).toMatchObject({ status: "AL_DIA", totalPending: 0, overdue: 0 });
+    expect((await getClientBehavior(pool, w.actor, c.id)).paidOnTime).toBe(1);
+
+    await reversePayment(deps, w.actor, {
+      idempotencyKey: key(),
+      paymentId: paid.result.paymentId,
+      reason: "Error",
+    });
+
+    expect((await getClientBehavior(pool, w.actor, c.id)).paidOnTime).toBe(0);
+    page = await listPortfolio(pool, w.actor, filters());
+    expect(page.rows[0]).toMatchObject({ totalPending: 100_000 });
   });
 
   it("no mezcla clientes de otro negocio", async () => {

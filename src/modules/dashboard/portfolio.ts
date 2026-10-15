@@ -38,7 +38,8 @@ export function parsePortfolioFilters(params: Record<string, string | string[] |
     routeId: route.success ? route.data : undefined,
     status: status.success ? status.data : undefined,
     search: search || undefined,
-    page: Number.isInteger(page) && page >= 1 ? page : 1,
+    // Tope: un número enorme daría un OFFSET inválido.
+    page: Number.isInteger(page) && page >= 1 && page <= 100_000 ? page : 1,
   };
 }
 
@@ -105,11 +106,11 @@ export async function listPortfolio(
      ),
      stats as (
        select cl.id, cl.name, cl.identification,
-              count(distinct l.id) filter (where i.id is not null) as loans,
+              count(distinct l.id) as loans,
               coalesce(sum(i.amount - coalesce(ap.amount, 0)) filter (where i.due_on < $2::date), 0) as overdue,
               coalesce(sum(i.amount - coalesce(ap.amount, 0)), 0) as pending,
-              max($2::date - i.due_on) filter (where i.due_on < $2::date) as max_days_late,
-              min(i.due_on) as oldest_due
+              max($2::date - i.due_on) filter (where i.due_on < $2::date and i.amount - coalesce(ap.amount, 0) > 0) as max_days_late,
+              min(i.due_on) filter (where i.amount - coalesce(ap.amount, 0) > 0) as oldest_due
          from public.clients cl
          left join public.contracts k on k.client_id = cl.id
          left join public.loans l on l.contract_id = k.id and l.status = 'ACTIVO'
@@ -117,7 +118,6 @@ export async function listPortfolio(
          left join applied ap on ap.installment_id = i.id
         where cl.business_id = $1
           and ($6::text is null or cl.name ilike $6 or cl.identification ilike $6)
-          and (i.id is null or i.amount - coalesce(ap.amount, 0) > 0)
         group by cl.id
      )
      select s.id, s.name, s.identification, s.loans::text, s.overdue::text, s.pending::text,

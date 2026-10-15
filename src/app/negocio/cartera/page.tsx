@@ -147,6 +147,9 @@ export default async function PortfolioPage({
       {page.rows.length === 0 ? (
         <div className="border-border mt-3 rounded-lg border border-dashed p-6 text-center">
           <p className="font-medium">Ningún cliente coincide con los filtros.</p>
+          <Link href="/negocio/cartera" className="text-primary mt-2 inline-block underline">
+            Quitar filtros
+          </Link>
         </div>
       ) : (
         <ol className="mt-3 flex flex-col gap-2">

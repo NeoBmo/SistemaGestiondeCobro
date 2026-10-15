@@ -1,6 +1,6 @@
 -- Seed de volumen para medir las consultas del dashboard y la cartera (F6). SOLO base local de desarrollo:
 -- crea un negocio «Volumen» con ~3.000 clientes, ~3.000 préstamos de 12 cuotas diarias (~36.000 cuotas) y
--- ~18.000 pagos con sus aplicaciones, repartidos en los últimos 60 días. Se carga sin disparadores
+-- ~21.600 pagos con sus aplicaciones, repartidos en los últimos 60 días. Se carga sin disparadores
 -- (`session_replication_role = replica`) para ir rápido: los datos son coherentes por construcción, no por
 -- las barreras de BD. Se borra con scripts/perf/clean-volume.sql.
 --
