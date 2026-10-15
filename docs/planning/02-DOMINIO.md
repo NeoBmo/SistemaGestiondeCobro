@@ -302,7 +302,7 @@ Se crea para: contratos, préstamos, pagos, cargos de mora, rutas, asignaciones,
 | Diferencia de liquidación | Saldo esperado − dinero entregado |
 | Meta diaria de cobrador | Cuotas vencidas o con vencimiento hoy de su cartera asignada |
 | Proyección de cobros futuros | Suma del valor esperado de cuotas pendientes, agrupada por fecha de vencimiento futura (nunca incluye cuotas ya pagadas ni cargos de mora sin confirmar) |
-| Dashboard | Agregados de contratos, préstamos, cuotas, pagos, cajas, gastos, liquidaciones |
+| Dashboard | Agregados de contratos, préstamos, cuotas, pagos, cajas, gastos, liquidaciones. Predeterminado: saldo de Caja Mayor, cartera pendiente y vencida, clientes en mora, cobrado y gastos del periodo, jornadas pendientes y diferencias sin resolver, proyección de 7 días; alertas derivadas de vencido, caja pendiente, diferencia y suscripción (ADR 0010). En los planes mensual y anual el Admin elige widgets, orden y periodo (solo presentación) |
 
 ---
 
