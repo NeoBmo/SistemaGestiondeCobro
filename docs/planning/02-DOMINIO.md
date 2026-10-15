@@ -278,6 +278,7 @@ Reglas: no crea pagos, desembolsos ni movimientos históricos en cajas; los pago
 Datos: negocio, creador, fecha, descripción, respuesta, última actualización, estado, prioridad.
 Estados: `ABIERTO`, `EN_ATENCION`, `RESUELTO`, `CERRADO`.
 Prioridad: `ALTA`, `MEDIA`, `BAJA` — campo simple sin SLA de tiempo de respuesta asociado. Sin chat, adjuntos ni automatizaciones en V1.
+Reglas (ADR 0011): lo crea el Admin del negocio y solo su negocio lo ve; el Super Admin lo atiende (`EN_ATENCION`/`RESUELTO`), puede cambiar la prioridad y escribe la respuesta; el Admin cierra un ticket `RESUELTO` o lo reabre; `CERRADO` es final. Cada cambio queda como evento de solo agregado.
 
 ### 6.3 Evento de auditoría
 
