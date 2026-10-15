@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, describe, expect, it } from "vitest";
 import { registerCapitalIncome, registerMainCashboxExpense } from "@/modules/cash/commands";
+import { getCashSummary } from "@/modules/cash/queries";
 import { assignClient } from "@/modules/collections/assignments";
 import { createCollector } from "@/modules/collections/collectors";
 import { createRoute } from "@/modules/collections/routes";
@@ -106,6 +107,8 @@ describe("agregados de cartera y caja", () => {
     const data = await getDashboard(pool, w.actor);
 
     expect(data.cashBalance).toBe(2_000_000 - 300_000 - 200_000 + 150_000 - 20_000);
+    // El dashboard y la Caja Mayor leen los mismos movimientos: no pueden divergir.
+    expect(data.cashBalance).toBe((await getCashSummary(pool, w.actor)).balance);
     expect(data.portfolio).toEqual({
       pending: 150_000 + 200_000,
       overdue: 150_000,

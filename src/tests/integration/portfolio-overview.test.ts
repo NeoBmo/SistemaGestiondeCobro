@@ -13,6 +13,7 @@ import {
 import { loadSessionContext, type SessionContext } from "@/modules/identity/session";
 import { createClient } from "@/modules/portfolio/clients";
 import { confirmContract } from "@/modules/portfolio/contracts";
+import { getLoanDetail } from "@/modules/portfolio/loan-queries";
 import { registerPayment } from "@/modules/portfolio/payments";
 import { refinanceLoan } from "@/modules/portfolio/refinancing";
 import { addDays, isoDate, localDateIn } from "@/shared/dates/dates";
@@ -104,6 +105,21 @@ describe("cartera", () => {
     });
     expect(page.rows[1]).toMatchObject({ maxDaysLate: 2, overdue: 200_000 });
     expect(page.total).toBe(4);
+  });
+
+  it("la prioridad coincide con el detalle real de cuotas y mora del préstamo", async () => {
+    const w = await business();
+    const c = await client(w, "Detalle");
+    const loanId = await loan(w, c.id, { principal: 300_000, installments: 3, firstOffset: -5 });
+    await registerPayment(deps, w.actor, { idempotencyKey: key(), loanId, amount: 150_000 });
+
+    const detail = await getLoanDetail(pool, w.actor, loanId);
+    const row = (await listPortfolio(pool, w.actor, filters())).rows[0]!;
+
+    expect(row.overdue).toBe(detail!.overdueBalance);
+    expect(row.totalPending).toBe(detail!.pendingBalance);
+    expect(row.maxDaysLate).toBe(Math.max(...detail!.installments.map((i) => i.daysLate)));
+    expect(row.oldestDue).toBe(detail!.installments.find((i) => i.pendingAmount > 0)!.dueOn);
   });
 
   it("filtra por estado, texto, cobrador y ruta; el texto no interpreta comodines", async () => {
