@@ -8,7 +8,7 @@ import type { PlanCode } from "@/modules/subscriptions/plans";
 import { addDays, isoDate, localDateIn, type IsoDate } from "@/shared/dates/dates";
 import { AppError } from "@/shared/errors/app-error";
 import { money, type Money } from "@/shared/money/money";
-import { periodRange, type Period } from "./periods";
+import { periodRange } from "./periods";
 import { resolveDashboardConfig, type DashboardConfig } from "./widgets";
 
 /**

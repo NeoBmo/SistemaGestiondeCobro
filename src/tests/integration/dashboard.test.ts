@@ -1,11 +1,21 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, describe, expect, it } from "vitest";
-import { registerCapitalIncome, registerMainCashboxExpense } from "@/modules/cash/commands";
+import {
+  registerCapitalIncome,
+  registerMainCashboxExpense,
+  reverseMovement,
+} from "@/modules/cash/commands";
+import { getCashSummary } from "@/modules/cash/queries";
 import { assignClient } from "@/modules/collections/assignments";
 import { createCollector } from "@/modules/collections/collectors";
 import { createRoute } from "@/modules/collections/routes";
 import { openSession, transferFund } from "@/modules/collections/sessions";
 import { confirmSettlement, declareSettlement } from "@/modules/collections/settlements";
+import {
+  getClientBehavior,
+  listPortfolio,
+  parsePortfolioFilters,
+} from "@/modules/dashboard/portfolio";
 import { getDashboard } from "@/modules/dashboard/queries";
 import { saveDashboardConfig } from "@/modules/dashboard/settings";
 import { loadSessionContext, type SessionContext } from "@/modules/identity/session";
@@ -106,6 +116,8 @@ describe("agregados de cartera y caja", () => {
     const data = await getDashboard(pool, w.actor);
 
     expect(data.cashBalance).toBe(2_000_000 - 300_000 - 200_000 + 150_000 - 20_000);
+    // El dashboard y la Caja Mayor leen los mismos movimientos: no pueden divergir.
+    expect(data.cashBalance).toBe((await getCashSummary(pool, w.actor)).balance);
     expect(data.portfolio).toEqual({
       pending: 150_000 + 200_000,
       overdue: 150_000,
@@ -177,6 +189,100 @@ describe("agregados de cartera y caja", () => {
     expect(data.config).toEqual({ period: "YEAR", widgets: ["COLLECTED"], configurable: true });
     expect(data.range.from).toBe(`${today().slice(0, 4)}-01-01`);
     expect(data.collected).toBe(50_000);
+  });
+});
+
+describe("solo lectura, zona horaria y bordes", () => {
+  it("leer el dashboard, la cartera y el historial no escribe nada", async () => {
+    const w = await business();
+    const l = await loan(w, { principal: 300_000, installments: 3, firstOffset: -4 });
+    await registerPayment(deps, w.actor, {
+      idempotencyKey: key(),
+      loanId: l.loanId,
+      amount: 100_000,
+    });
+    const counts = async () =>
+      (
+        await pool.query<Record<string, string>>(
+          `select (select count(*) from public.payments where business_id = $1)::text as payments,
+                  (select count(*) from public.cash_movements where business_id = $1)::text as movements,
+                  (select count(*) from public.installments where business_id = $1)::text as installments,
+                  (select count(*) from public.audit_events where business_id = $1)::text as audit,
+                  (select count(*) from public.dashboard_settings where business_id = $1)::text as settings`,
+          [w.businessId],
+        )
+      ).rows[0];
+    const before = await counts();
+
+    await getDashboard(pool, w.actor);
+    await listPortfolio(pool, w.actor, parsePortfolioFilters({}));
+    await getClientBehavior(pool, w.actor, l.clientId);
+
+    expect(await counts()).toEqual(before);
+  });
+
+  it("«hoy» es el de la zona del negocio, no el de UTC (a las 22:30 de Bogotá ya es el día siguiente en UTC)", async () => {
+    const w = await business();
+    const now = new Date("2026-10-15T03:30:00Z"); // 22:30 del 14 en Bogotá
+
+    const data = await getDashboard(pool, w.actor, now);
+
+    expect(data.today).toBe("2026-10-14");
+    expect(data.range).toEqual({ from: "2026-09-15", to: "2026-10-14" });
+    expect(data.projection[0]!.date).toBe("2026-10-15");
+  });
+
+  it("una cuota que vence hoy no es cartera vencida", async () => {
+    const w = await business();
+    await loan(w, { principal: 100_000, installments: 1, firstOffset: 0 });
+
+    const data = await getDashboard(pool, w.actor);
+
+    expect(data.portfolio).toMatchObject({ pending: 100_000, overdue: 0, clientsInArrears: 0 });
+    expect(data.alerts).toEqual([]);
+  });
+
+  it("el gasto reversado no cuenta en los gastos del periodo", async () => {
+    const w = await business();
+    const spent = await registerMainCashboxExpense(deps, w.actor, {
+      idempotencyKey: key(),
+      amount: 40_000,
+      category: "GASOLINA",
+    });
+    expect((await getDashboard(pool, w.actor)).spent).toBe(40_000);
+
+    await reverseMovement(deps, w.actor, {
+      idempotencyKey: key(),
+      movementId: spent.result.movementId,
+      reason: "Error",
+    });
+
+    expect((await getDashboard(pool, w.actor)).spent).toBe(0);
+  });
+
+  it("al bajar de plan, la configuración guardada se conserva pero se ve la predeterminada", async () => {
+    const w = await business("ANUAL");
+    await saveDashboardConfig(deps, w.actor, { period: "YEAR", widgets: ["SPENT"] });
+    await pool.query(
+      "update public.subscriptions set plan_code = 'SEMANAL' where business_id = $1",
+      [w.businessId],
+    );
+
+    const data = await getDashboard(pool, w.actor);
+
+    expect(data.config).toMatchObject({ period: "7D", configurable: false });
+    expect(data.config.widgets).toHaveLength(7);
+    const kept = await pool.query(
+      "select period from public.dashboard_settings where business_id = $1",
+      [w.businessId],
+    );
+    expect(kept.rows[0]!.period).toBe("YEAR");
+    // Tampoco puede actualizar la configuración mientras siga en el plan semanal.
+    await expect(
+      pool.query("update public.dashboard_settings set period = '30D' where business_id = $1", [
+        w.businessId,
+      ]),
+    ).rejects.toMatchObject({ code: "23514" });
   });
 });
 
