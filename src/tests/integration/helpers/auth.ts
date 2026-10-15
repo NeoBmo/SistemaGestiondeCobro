@@ -196,6 +196,19 @@ export class TestFixtures {
           this.businessIds,
         ]);
       }
+      await client.query(
+        "delete from public.support_ticket_events where business_id = any($1) or actor_id = any($2)",
+        [this.businessIds, this.userIds],
+      );
+      await client.query("delete from public.support_tickets where business_id = any($1)", [
+        this.businessIds,
+      ]);
+      await client.query("delete from public.backup_checks where registered_by = any($1)", [
+        this.userIds,
+      ]);
+      await client.query("delete from public.dashboard_settings where business_id = any($1)", [
+        this.businessIds,
+      ]);
       await client.query("delete from public.idempotency_keys where business_id = any($1)", [
         this.businessIds,
       ]);
