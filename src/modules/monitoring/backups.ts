@@ -63,7 +63,10 @@ export type BackupStatus = {
   last: { checkedOn: string; result: "OK" | "FALLO"; note: string | null } | null;
   /** Días con verificación OK en los últimos 7 (de 7 posibles): la retención prometida. */
   okDaysLast7: number;
-  /** `SIN_REGISTRO`, `FALLO` (la última falló), `VENCIDO` (más de 24 h sin verificar) o `INCOMPLETO` (<7 días OK). */
+  /**
+   * `SIN_REGISTRO`, `FALLO` (la última falló), `VENCIDO` (la última verificación es de hace más de un día
+   * calendario UTC) o `INCOMPLETO` (menos de 7 días OK: sale también en la primera semana de operación).
+   */
   alert: "SIN_REGISTRO" | "FALLO" | "VENCIDO" | "INCOMPLETO" | null;
 };
 

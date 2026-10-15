@@ -233,7 +233,7 @@ describe("indicadores del Super Admin", () => {
       expect((await getPlatformIndicators(client, root, NOW)).stale).toBe(true);
     });
     await withRollback(pool, async (client) => {
-      const none = await getPlatformIndicators(client, root, new Date("2050-01-01T00:00:00Z"));
+      const none = await getPlatformIndicators(client, root, new Date("2000-01-01T00:00:00Z"));
       expect(none).toMatchObject({
         stale: true,
         minutesSinceLastCheck: null,
