@@ -21,6 +21,6 @@ export async function POST(request: Request): Promise<Response> {
     const input = parseBody(createTicketSchema, await readJsonBody(request));
     return commandResponse(await createTicket({ db }, actor, input), 201);
   } catch (error) {
-    return errorResponse(error);
+    return errorResponse(error, request);
   }
 }

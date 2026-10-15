@@ -4,5 +4,8 @@ export async function register() {
     const { getPublicEnv, getServerEnv } = await import("@/shared/validation/env");
     getPublicEnv();
     getServerEnv();
+    // Errores inesperados de los Route Handlers → registro de plataforma (ADR 0011).
+    const { installErrorReporter } = await import("@/modules/monitoring/record-error");
+    installErrorReporter();
   }
 }

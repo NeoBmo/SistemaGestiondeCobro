@@ -20,6 +20,6 @@ export async function POST(request: Request): Promise<Response> {
     const input = parseBody(dashboardConfigSchema, await readJsonBody(request));
     return commandResponse(await saveDashboardConfig({ db }, actor, input));
   } catch (error) {
-    return errorResponse(error);
+    return errorResponse(error, request);
   }
 }

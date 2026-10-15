@@ -1,7 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { AppError } from "@/shared/errors/app-error";
-import { commandResponse, errorResponse, parseBody, readJsonBody } from "./command-response";
+import {
+  commandResponse,
+  errorResponse,
+  parseBody,
+  readJsonBody,
+  setUnexpectedErrorReporter,
+} from "./command-response";
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -82,5 +88,38 @@ describe("parseBody", () => {
       expect(error).toMatchObject({ code: "INVALID_REQUEST", status: 400 });
       expect((error as AppError).message).not.toContain("SuperSecreta1");
     }
+  });
+});
+
+describe("errorResponse con reporte de errores inesperados", () => {
+  it("avisa la ruta sin identificadores y el tipo del error, nunca el mensaje", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const reports: { route: string; errorName: string }[] = [];
+    setUnexpectedErrorReporter((report) => reports.push(report));
+    const request = new Request(
+      "http://localhost/api/negocio/prestamos/4f9d2d7e-1c34-4a55-9b0e-8c2d1e7f6a10/anular?x=1",
+    );
+
+    errorResponse(new TypeError("password=secreto"), request);
+    errorResponse(new AppError("FORBIDDEN", "No", 403), request);
+    errorResponse(new Error("sin request"));
+
+    expect(reports).toEqual([
+      { route: "/api/negocio/prestamos/:id/anular", errorName: "TypeError" },
+      { route: "desconocida", errorName: "Error" },
+    ]);
+    setUnexpectedErrorReporter(undefined);
+  });
+
+  it("un reporte que falla no altera la respuesta", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    setUnexpectedErrorReporter(() => {
+      throw new Error("base caída");
+    });
+
+    const res = errorResponse(new Error("x"));
+
+    expect(res.status).toBe(500);
+    setUnexpectedErrorReporter(undefined);
   });
 });

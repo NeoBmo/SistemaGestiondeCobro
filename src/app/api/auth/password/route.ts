@@ -24,6 +24,6 @@ export async function POST(request: Request): Promise<Response> {
     );
     return commandResponse({});
   } catch (error) {
-    return errorResponse(error);
+    return errorResponse(error, request);
   }
 }

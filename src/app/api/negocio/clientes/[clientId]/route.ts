@@ -29,6 +29,6 @@ export async function POST(request: Request, context: RouteContext): Promise<Res
     const { client, changed } = await updateClient({ db }, actor, clientId.data, input);
     return commandResponse({ client, changed });
   } catch (error) {
-    return errorResponse(error);
+    return errorResponse(error, request);
   }
 }

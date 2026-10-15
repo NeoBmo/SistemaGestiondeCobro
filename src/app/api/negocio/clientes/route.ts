@@ -22,6 +22,6 @@ export async function POST(request: Request): Promise<Response> {
     const input = parseBody(createClientSchema, await readJsonBody(request));
     return commandResponse(await createClient({ db }, actor, input), 201);
   } catch (error) {
-    return errorResponse(error);
+    return errorResponse(error, request);
   }
 }
