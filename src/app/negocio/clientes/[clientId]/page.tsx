@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getPageSession } from "@/modules/identity/page-session";
 import { getClientAssignment, listAssignableRoutes } from "@/modules/collections/queries";
+import { getClientBehavior } from "@/modules/dashboard/portfolio";
 import { getClientDetail } from "@/modules/portfolio/client-queries";
 import { getPool } from "@/shared/database/pg-pool";
 import { formatIsoDate } from "@/shared/dates/dates";
@@ -26,9 +27,10 @@ export default async function ClientPage({ params }: { params: Promise<{ clientI
   if (!detail) notFound();
   const { client, loans } = detail;
   const db = getPool();
-  const [assignment, routes] = await Promise.all([
+  const [assignment, routes, behavior] = await Promise.all([
     getClientAssignment(db, session, client.id),
     listAssignableRoutes(db, session),
+    getClientBehavior(db, session, client.id),
   ]);
 
   return (
@@ -86,6 +88,42 @@ export default async function ClientPage({ params }: { params: Promise<{ clientI
             ))}
           </ul>
         )}
+      </section>
+
+      <section aria-labelledby="comportamiento" className="mt-8">
+        <h2 id="comportamiento" className="text-xl font-semibold">
+          Historial de comportamiento
+        </h2>
+        <p className="text-muted mt-1 text-sm">Cifras de sus cuotas; no es un puntaje.</p>
+        <dl
+          className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3"
+          data-testid="comportamiento"
+        >
+          <div>
+            <dt className="text-muted text-sm">Cuotas pagadas a tiempo</dt>
+            <dd className="font-mono tabular-nums">{behavior.paidOnTime}</dd>
+          </div>
+          <div>
+            <dt className="text-muted text-sm">Cuotas pagadas tarde</dt>
+            <dd className="font-mono tabular-nums">{behavior.paidLate}</dd>
+          </div>
+          <div>
+            <dt className="text-muted text-sm">Cuotas vencidas hoy</dt>
+            <dd className="font-mono tabular-nums">{behavior.overdueInstallments}</dd>
+          </div>
+          <div>
+            <dt className="text-muted text-sm">Días de mora actual</dt>
+            <dd className="font-mono tabular-nums">{behavior.maxDaysLate}</dd>
+          </div>
+          <div>
+            <dt className="text-muted text-sm">Saldo vencido</dt>
+            <dd className="font-mono tabular-nums">{formatMoney(behavior.overdue)}</dd>
+          </div>
+          <div>
+            <dt className="text-muted text-sm">Refinanciaciones</dt>
+            <dd className="font-mono tabular-nums">{behavior.refinancings}</dd>
+          </div>
+        </dl>
       </section>
 
       <section aria-labelledby="cartera" className="mt-8">

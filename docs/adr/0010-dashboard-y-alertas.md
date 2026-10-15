@@ -26,3 +26,7 @@ F6 convierte los datos de F1–F5 en información de decisión sin reglas de neg
 
 - Un indicador nuevo o una alerta nueva se añaden sin migración de datos: solo código de lectura.
 - Si un negocio baja de mensual/anual a semanal, su configuración se conserva pero el dashboard se muestra en su forma predeterminada.
+
+## Medición con volumen (F6-T3)
+
+`scripts/perf/seed-volume.sql` carga un negocio con 3.000 clientes, 3.000 préstamos, 36.000 cuotas y 21.600 pagos (solo base local; se borra con `scripts/perf/clean-volume.sql`). Con ese volumen, medido en el entorno de desarrollo (promedio de 3 corridas): dashboard completo ≈ 80 ms, cartera con prioridad (primera página) ≈ 100 ms, cartera filtrada por texto ≈ 40 ms e historial de un cliente ≈ 40 ms. Las consultas de rango por vencimiento ya usan `installments_business_due_idx`, así que no hizo falta un índice nuevo. Si un negocio real supera con holgura este volumen, el siguiente paso es materializar los agregados de cartera, no recalcularlos por petición.

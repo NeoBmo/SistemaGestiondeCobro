@@ -1,22 +1,41 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getCashSummary } from "@/modules/cash/queries";
+import { getDashboard } from "@/modules/dashboard/queries";
 import { getPageSession } from "@/modules/identity/page-session";
 import { getPool } from "@/shared/database/pg-pool";
 import { formatMoney } from "@/shared/money/money";
+import { CashFeedbackProvider } from "./_components/cash-feedback";
+import { DashboardSettings } from "./_components/dashboard-settings";
+import { DashboardView } from "./_components/dashboard-view";
 
 export const metadata: Metadata = { title: "Negocio" };
 
 export default async function NegocioPage() {
   const session = await getPageSession({ roles: ["ADMIN_NEGOCIO"] });
-  const summary = await getCashSummary(getPool(), session);
+  const db = getPool();
+  const [summary, dashboard] = await Promise.all([
+    getCashSummary(db, session),
+    getDashboard(db, session),
+  ]);
 
   return (
-    <>
+    <CashFeedbackProvider>
       <h1 className="text-2xl font-semibold md:text-3xl">Negocio</h1>
-      <p className="text-muted mt-2 text-sm">
-        Tu cuenta está activa. Los préstamos se habilitan en las siguientes entregas.
-      </p>
+      <div className="mt-4">
+        <DashboardView data={dashboard} />
+        {dashboard.config.configurable ? (
+          <div className="mt-4">
+            <DashboardSettings
+              initial={{ period: dashboard.config.period, widgets: dashboard.config.widgets }}
+            />
+          </div>
+        ) : (
+          <p className="text-muted mt-3 text-sm">
+            Tu plan muestra el resumen predeterminado de los últimos 7 días.
+          </p>
+        )}
+      </div>
 
       <section aria-labelledby="caja" className="border-border mt-6 max-w-md rounded-lg border p-4">
         <h2 id="caja" className="text-lg font-medium">
@@ -50,6 +69,7 @@ export default async function NegocioPage() {
             ["/negocio/cobradores", "Cobradores"],
             ["/negocio/rutas", "Rutas"],
             ["/negocio/jornadas", "Jornadas"],
+            ["/negocio/cartera", "Cartera"],
           ].map(([href, label]) => (
             <Link
               key={href}
@@ -77,6 +97,6 @@ export default async function NegocioPage() {
           Ver clientes
         </Link>
       </section>
-    </>
+    </CashFeedbackProvider>
   );
 }
