@@ -88,6 +88,6 @@ export async function POST(request: Request, context: RouteContext): Promise<Res
       outcome.replayed ? 200 : 201,
     );
   } catch (error) {
-    return errorResponse(error);
+    return errorResponse(error, request);
   }
 }

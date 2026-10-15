@@ -28,6 +28,6 @@ export async function POST(request: Request): Promise<Response> {
       outcome.replayed ? 200 : 201,
     );
   } catch (error) {
-    return errorResponse(error);
+    return errorResponse(error, request);
   }
 }

@@ -21,6 +21,6 @@ export async function POST(request: Request): Promise<Response> {
     const input = parseBody(importLoanTermsSchema, await readJsonBody(request));
     return commandResponse(await previewImportedLoan({ db }, actor, input));
   } catch (error) {
-    return errorResponse(error);
+    return errorResponse(error, request);
   }
 }

@@ -8,6 +8,6 @@ export async function POST(request: Request): Promise<Response> {
     await (await createSupabaseServerClient()).auth.signOut({ scope: "local" });
     return commandResponse({});
   } catch (error) {
-    return errorResponse(error);
+    return errorResponse(error, request);
   }
 }

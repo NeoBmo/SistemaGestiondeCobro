@@ -30,6 +30,6 @@ export async function POST(request: Request, context: RouteContext): Promise<Res
       await closeOrReopenTicket({ db }, actor, ticketId.data, action as keyof typeof ACTIONS),
     );
   } catch (error) {
-    return errorResponse(error);
+    return errorResponse(error, request);
   }
 }

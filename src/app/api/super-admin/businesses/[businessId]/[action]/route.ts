@@ -96,6 +96,6 @@ export async function POST(request: Request, context: RouteContext): Promise<Res
     }
     return commandResponse(result);
   } catch (error) {
-    return errorResponse(error);
+    return errorResponse(error, request);
   }
 }

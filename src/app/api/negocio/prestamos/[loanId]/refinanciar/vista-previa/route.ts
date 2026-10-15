@@ -28,6 +28,6 @@ export async function POST(request: Request, context: RouteContext): Promise<Res
     const terms = parseBody(refinanceTermsSchema, await readJsonBody(request));
     return commandResponse(await previewRefinancing({ db }, actor, loanId.data, terms));
   } catch (error) {
-    return errorResponse(error);
+    return errorResponse(error, request);
   }
 }

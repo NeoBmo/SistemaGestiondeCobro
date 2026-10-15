@@ -15,6 +15,8 @@ const serverEnvSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: nonEmpty,
   DATABASE_URL: z.string().regex(/^postgres(ql)?:\/\/\S+$/),
   AUTH_SYNTHETIC_EMAIL_DOMAIN: z.string().regex(HOSTNAME),
+  // Secreto del chequeo de disponibilidad programado (ADR 0011); sin él el chequeo está deshabilitado.
+  MONITOR_SECRET: z.string().min(32).optional(),
 });
 
 export type PublicEnv = { supabaseUrl: string; supabaseAnonKey: string };
@@ -22,6 +24,7 @@ export type ServerEnv = {
   supabaseServiceRoleKey: string;
   databaseUrl: string;
   syntheticEmailDomain: string;
+  monitorSecret?: string;
 };
 
 /** Valida y devuelve; el error nombra las variables, nunca sus valores (pueden ser secretos). */
@@ -50,6 +53,7 @@ export function parseServerEnv(source: EnvSource): ServerEnv {
     supabaseServiceRoleKey: env.SUPABASE_SERVICE_ROLE_KEY,
     databaseUrl: env.DATABASE_URL,
     syntheticEmailDomain: env.AUTH_SYNTHETIC_EMAIL_DOMAIN,
+    ...(env.MONITOR_SECRET ? { monitorSecret: env.MONITOR_SECRET } : {}),
   };
 }
 

@@ -8,8 +8,31 @@ export function commandResponse<T>(data: T, status = 200): Response {
   return Response.json(ok(data), { status, headers: NO_STORE });
 }
 
+/**
+ * Quien registra los errores inesperados (ADR 0011). `shared` no conoce los módulos: el arranque del
+ * servidor (`instrumentation.ts`) lo instala. Recibe solo la ruta y el tipo del error, nunca su mensaje.
+ */
+export type UnexpectedErrorReporter = (report: { route: string; errorName: string }) => void;
+let reporter: UnexpectedErrorReporter | undefined;
+export function setUnexpectedErrorReporter(next: UnexpectedErrorReporter | undefined): void {
+  reporter = next;
+}
+
+/** Ruta sin identificadores (`/api/negocio/prestamos/:id`) para agrupar y no guardar ids de negocios. */
+function routeOf(request: Request | undefined): string {
+  if (!request) return "desconocida";
+  try {
+    return new URL(request.url).pathname.replace(
+      /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi,
+      ":id",
+    );
+  } catch {
+    return "desconocida";
+  }
+}
+
 /** Errores de dominio conservan su código y estado; el resto se oculta tras un 500 genérico. */
-export function errorResponse(error: unknown): Response {
+export function errorResponse(error: unknown, request?: Request): Response {
   if (isAppError(error)) {
     return Response.json(fail(error.code, error.message), {
       status: error.status,
@@ -17,7 +40,13 @@ export function errorResponse(error: unknown): Response {
     });
   }
   // Solo el tipo: el mensaje de un error inesperado puede contener secretos o datos personales.
-  console.error("[api] error no controlado:", error instanceof Error ? error.name : typeof error);
+  const errorName = error instanceof Error ? error.name : typeof error;
+  console.error("[api] error no controlado:", errorName);
+  try {
+    reporter?.({ route: routeOf(request), errorName });
+  } catch {
+    // Registrar es de mejor esfuerzo: nunca altera la respuesta.
+  }
   return Response.json(fail("INTERNAL_ERROR", "Ocurrió un error inesperado. Intenta de nuevo."), {
     status: 500,
     headers: NO_STORE,

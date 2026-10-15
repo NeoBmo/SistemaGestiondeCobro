@@ -24,6 +24,6 @@ export async function POST(request: Request, context: RouteContext): Promise<Res
     const input = parseBody(attendTicketSchema, await readJsonBody(request));
     return commandResponse(await attendTicket({ db: getPool() }, actor, ticketId.data, input));
   } catch (error) {
-    return errorResponse(error);
+    return errorResponse(error, request);
   }
 }

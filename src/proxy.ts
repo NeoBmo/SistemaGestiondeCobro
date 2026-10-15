@@ -43,9 +43,9 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // Todo menos estáticos, imágenes optimizadas, el icono, la comprobación de salud y login/logout, que
+  // Todo menos estáticos, imágenes optimizadas, el icono, la comprobación de salud, el chequeo de monitoreo (sin sesión) y login/logout, que
   // gestionan sus propias cookies (si el proxy también las escribiera, el orden de fusión no está garantizado).
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|api/health|api/auth/login|api/auth/logout).*)",
+    "/((?!_next/static|_next/image|favicon.ico|api/health|api/monitoreo|api/auth/login|api/auth/logout).*)",
   ],
 };

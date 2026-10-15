@@ -39,6 +39,6 @@ export async function POST(request: Request, context: RouteContext): Promise<Res
 
     return commandResponse({ ...outcome.result, replayed: outcome.replayed });
   } catch (error) {
-    return errorResponse(error);
+    return errorResponse(error, request);
   }
 }

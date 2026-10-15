@@ -20,6 +20,6 @@ export async function POST(request: Request, context: RouteContext): Promise<Res
     if (!routeId.success) throw new AppError("ROUTE_NOT_FOUND", "La ruta no existe", 404);
     return commandResponse(await closeRoute({ db }, actor, routeId.data));
   } catch (error) {
-    return errorResponse(error);
+    return errorResponse(error, request);
   }
 }
