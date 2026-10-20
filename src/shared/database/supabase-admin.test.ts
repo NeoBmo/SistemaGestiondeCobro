@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const env = {
+  PUBLIC_SITE_URL: "https://cuadre.example",
   NEXT_PUBLIC_SUPABASE_URL: "https://proyecto.supabase.co",
   NEXT_PUBLIC_SUPABASE_ANON_KEY: "anon-key",
   SUPABASE_SERVICE_ROLE_KEY: "service-role-key",
