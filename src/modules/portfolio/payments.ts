@@ -7,6 +7,7 @@ import { AppError } from "@/shared/errors/app-error";
 import type { IdempotencyKey } from "@/shared/ids/idempotency-key";
 import { formatMoney, money } from "@/shared/money/money";
 import type { ContractDeps } from "./contracts";
+import { allocatePayment } from "./payment-allocation";
 
 /**
  * Pagos y reversos (02 §3.1–3.2, ADR 0008). Comandos financieros sobre `runCashCommand`: una transacción,
@@ -218,31 +219,32 @@ function runRegisterPayment(
         });
       } else {
         const installments = await installmentsWithApplied(tx, input.loanId);
-        const totalPending = installments.reduce((sum, i) => sum + (i.amount - i.applied), 0);
+        const allocation = allocatePayment(
+          installments.map((installment) => ({
+            id: installment.id,
+            number: installment.number,
+            pendingAmount: installment.amount - installment.applied,
+          })),
+          input.amount,
+        );
+        const totalPending = allocation.pending;
         if (totalPending <= 0)
           throw new AppError("LOAN_PAID", "Este préstamo no tiene cuotas pendientes", 409);
-        if (input.amount > totalPending) {
+        if (!allocation.ok) {
           throw new AppError(
             "PAYMENT_EXCEEDS_BALANCE",
             `El pago supera el saldo pendiente de las cuotas, que es de ${formatMoney(money(totalPending))}`,
             409,
           );
         }
-        // Cuota pendiente más antigua primero; el excedente pasa a la siguiente (02 §3.2).
-        let remaining = input.amount;
-        for (const installment of installments) {
-          if (remaining === 0) break;
-          const pending = installment.amount - installment.applied;
-          if (pending <= 0) continue;
-          const applied = Math.min(remaining, pending);
+        for (const part of allocation.lines) {
           planned.push({
-            installmentId: installment.id,
+            installmentId: part.installment.id,
             chargeId: null,
-            number: installment.number,
-            amount: applied,
-            pendingAfter: pending - applied,
+            number: part.installment.number,
+            amount: part.applied,
+            pendingAfter: part.pendingAfter,
           });
-          remaining -= applied;
         }
       }
 
