@@ -3,26 +3,19 @@
 > Aplica a **cualquier** agente que trabaje en este repo (OpenCode, Claude Code u otro).
 > Este archivo no sustituye a nada: da el **cómo** trabajar aquí.
 
-## Autoridad (léela antes de decidir nada)
+## Fuentes de verdad
 
-1. `CLAUDE.md` — autoridad del proyecto: stack pineado, allowlist de operaciones, reglas de negocio no negociables.
-2. `docs/planning/02-DOMINIO.md` — **gana en negocio**. Estados, invariantes, fórmulas, permisos.
-3. `docs/planning/03-ARQUITECTURA.md` — gana en técnico. Decisiones en `docs/adr/`.
-4. `docs/planning/04-PLAN.md` — fases y sus criterios de salida. `05-PENDIENTES.md` — lo que **no** está decidido.
+- `docs/planning/02-DOMINIO.md` manda en reglas de negocio.
+- `docs/planning/03-ARQUITECTURA.md` y las decisiones aceptadas en `docs/adr/` mandan en arquitectura.
+- `docs/planning/04-PLAN.md` define fases y criterios de salida; `05-PENDIENTES.md` registra lo no decidido.
+- Este archivo es la guía operativa común. `CLAUDE.md` importa este archivo por compatibilidad; no es una autoridad superior.
+- Skills y agentes describen procedimientos; no pueden cambiar las fuentes anteriores.
 
-Ante conflicto: `CLAUDE.md` para política del repo, `02` para reglas de negocio, `03` para decisiones técnicas. Este archivo solo describe el estado real y las trampas del tooling.
+Los permisos no se heredan de esta prosa: cada cliente aplica su configuración de sandbox, permisos y aprobaciones. Los hooks y checks de CI solo garantizan las acciones que ejecutan explícitamente.
 
-### Orden de autoridad (skills incluidas)
+### Skills y agentes
 
-De mayor a menor:
-
-1. `CLAUDE.md`.
-2. `docs/planning/02-DOMINIO.md` (negocio) y `docs/planning/03-ARQUITECTURA.md` (técnico).
-3. `AGENTS.md`.
-4. `docs/planning/05-PENDIENTES.md` y `docs/planning/07-FLUJO-DE-TRABAJO.md`.
-5. `.claude/agents/` y `.claude/skills/`.
-
-**La regla que lo gobierna:** una skill **nunca** introduce una regla que no esté en los niveles 1-4. Si una skill la contradice, **manda el documento** y lo que se corrige es la skill, no al revés. `docs/planning/06-AGENTES-HABILIDADES.md:36` ya dice esto para los subagentes ("si un subagente y `CLAUDE.md` entran en conflicto, gana `CLAUDE.md`"); aquí se extiende a las skills, que son material de terceros y pueden cambiar de versión sin avisar.
+Una skill nunca introduce una regla que no esté en las fuentes de verdad anteriores. Si contradice una fuente normativa, se corrige la skill o agente. El detalle de uso y la política de esfuerzo según riesgo están en `docs/planning/06-AGENTES-HABILIDADES.md` §7 y ADR 0013; no se hace fallback ni escalamiento automático.
 
 ### Reparto por skill (sin solapes)
 
@@ -44,9 +37,8 @@ No «qué skill es más nueva» ni «qué dice la skill», sino esto: **manda el
 
 ## Estado actual
 
-- Fases **F0–F4 terminadas**. Sigue **F5**: cobradores, rutas de cobro, Caja Menor y liquidación.
-- `src/modules/collections/` está vacío — es el módulo de F5.
-- Antes de empezar a construir, ejecuta el subagente `verificador-de-fase` sobre F4: no des por hecha la base.
+- F0–F6 constan como terminadas en README; F7 está en cierre/verificación y F8 sigue pendiente. El estado reportado no certifica el criterio de salida: usa `docs/planning/04-PLAN.md` y el verificador de fase.
+- `docs/planning/05-PENDIENTES.md` contiene bloqueadores de F8. No los resuelvas por inferencia ni comiences trabajo que dependa de ellos sin aclaración humana.
 
 ## Verificación (el orden que exige CI)
 
@@ -85,7 +77,17 @@ Esas dos líneas se ejecutan al **cargar el módulo**, antes de que Playwright p
 
 Ojo al mensaje: señala a `global-setup.ts`, que pertenece a la integración de **Vitest**. Playwright nunca lo ejecuta, así que esa pista desorienta.
 
-`smoke.spec.ts` no usa fixtures: es el único que corre sin base de datos y pasa 30/30 en `desktop` y `mobile`.
+`smoke.spec.ts` y `frontend-vitals.spec.ts` corren sin base de datos; `frontend-profiles.spec.ts` se omite con razón explícita si Supabase local no está disponible. Los demás recorridos que construyen fixtures al cargar el módulo requieren Supabase local, aunque tengan `test.skip`.
+
+### Trampa de e2e: los recorridos con sesión real comparten una sola base
+
+`journeys`, `payments` y `portfolio` corren contra un **único Postgres**, y su `purge()` ejecuta `alter table … disable trigger append_only_row`, que es **global**, no acotado al test: mientras uno limpia, otro escribe y la barrera de inmutabilidad está abierta.
+
+Por eso `workers: 1` y `fullyParallel: false` en `playwright.config.ts` no son una optimización sino **correctitud**. Subirlos reintroduce una carrera que se manifiesta como fallos intermitentes y cambiantes entre corridas, no como un error reproducible.
+
+Los dos son necesarios y no se contradicen: `fullyParallel` solo gobierna los tests **dentro** de un fichero; el paralelismo **entre ficheros** lo decide `workers`, que por defecto es la mitad de los núcleos lógicos.
+
+`smoke.spec.ts` sí es inocuo en paralelo: no usa fixtures ni toca la base.
 
 Para correr la suite completa:
 
@@ -105,7 +107,7 @@ En CI no ocurre el fallo: el job `e2e` levanta Supabase local y además fija `E2
 ## Entorno
 
 - No existe script `db:reset`. Para migraciones locales usa `npm run db:migrate` (`supabase migration up`).
-- El servidor no arranca sin las 5 variables validadas en `src/instrumentation.ts` → `src/shared/validation/env.ts`. Lee esa cadena antes de culpar a otro de un fallo de arranque.
+- El servidor requiere las 6 variables obligatorias validadas en `src/instrumentation.ts` → `src/shared/validation/env.ts` (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `PUBLIC_SITE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `DATABASE_URL` y `AUTH_SYNTHETIC_EMAIL_DOMAIN`); `MONITOR_SECRET` es opcional. Lee esa cadena antes de culpar a otro de un fallo de arranque.
 - `AUTH_SYNTHETIC_EMAIL_DOMAIN` debe ser un **hostname con punto y TLD**: `localhost` no pasa el regex.
 - `.env.example` sí se lee. `.env.local` y cualquier otro secreto están bloqueados por permisos, en ambas herramientas. Jamás los leas ni los escribas.
 
@@ -154,6 +156,8 @@ Solo sube parches o minors de bajo riesgo, y siempre revisa la tabla de stack de
 ## Git
 
 - Una tarea, una rama. **Nunca commitees en `main`.**
+- `main` no se modifica directamente. Los commits son checkpoints/versiones atómicas de la rama.
+- Solo integra a `main` mediante PR cuando las verificaciones aplicables estén verdes y exista aprobación humana explícita. Mientras las reglas de protección de GitHub estén desactivadas, el equipo aplica esa puerta manualmente.
 - Commits atómicos; migraciones y lógica de negocio en commits separados.
 - `git push`, `git merge`, `supabase db push`, `supabase db reset`, `rm` y `mv` **requieren confirmación humana**. El force-push, `git reset --hard`, `git clean` y `git branch -D` están bloqueados sin excepción.
 - No hagas commit de nada que no te hayan pedido commitar.
@@ -172,3 +176,13 @@ Los subagentes de `.opencode/agents/` y los skills de `.claude/skills/` están c
 ## Estilo de respuesta
 
 Ultraconciso. Al mostrar código, muestra solo el diff de las líneas modificadas, nunca el archivo completo salvo que se pida explícitamente.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

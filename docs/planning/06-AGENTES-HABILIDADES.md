@@ -1,4 +1,4 @@
-# 06 — Agentes y habilidades para Claude Code
+# 06 — Agentes, habilidades y política de esfuerzo
 
 > Objetivo de este documento: que trabajar con Claude Code en este repo sea repetible y no dependa de que cada sesión "recuerde" las reglas de `02-DOMINIO.md` y `03-ARQUITECTURA.md` de memoria. Verifica la sintaxis exacta de subagentes/skills en la documentación actual de Claude Code antes de crearlos — aquí se da el criterio de diseño, no la sintaxis literal.
 
@@ -31,11 +31,22 @@ Este proyecto tiene un riesgo específico de "código espagueti": mezclar la cap
 - **Supabase MCP** (si está disponible): consultar el esquema real, RLS y migraciones aplicadas sin salir de la sesión, para evitar que un agente proponga una migración que ya existe o contradiga una política de RLS vigente.
 - **GitHub/Git**: para que las fases de `04-PLAN.md` se reflejen en historial de commits/PRs claramente delimitado por fase — facilita auditar qué fase introdujo qué.
 
-## 5. Regla de convivencia con `CLAUDE.md`
+## 5. Regla de convivencia con instrucciones compartidas
 
-`CLAUDE.md` en la raíz sigue siendo la autoridad que cualquier agente lee primero. Los subagentes de este documento son una forma de **aplicar** esas reglas de forma consistente, no de reemplazarlas. Si un subagente y `CLAUDE.md` entran en conflicto, gana `CLAUDE.md`, y eso es señal de que el subagente necesita ajustarse — no al revés.
+`AGENTS.md` es la entrada común para Codex, Claude Code y OpenCode. `CLAUDE.md` importa `@AGENTS.md` por compatibilidad con Claude Code. Las reglas de negocio se rigen por `02-DOMINIO.md`; las técnicas, por `03-ARQUITECTURA.md` y los ADR aceptados. Los subagentes de este documento operacionalizan esas fuentes, no las reemplazan.
 
 ## 6. Qué mantener actualizado a mano (no automatizable)
 
 - `05-PENDIENTES.md`: cuando una decisión pendiente se resuelve, se mueve a `02-DOMINIO.md`/`03-ARQUITECTURA.md` y se borra de aquí en el mismo cambio.
 - `04-PLAN.md`: si una fase cambia de alcance, se edita ahí antes de que el código diverja del plan escrito.
+
+## 7. Nivel de esfuerzo y revisión por riesgo
+
+Consulta [ADR 0013](../adr/0013-politica-modelo-esfuerzo-revision.md) para la matriz T1/T2/T3. Los niveles se mapean a lo que soporte cada herramienta; no fijan proveedor ni modelo.
+
+- **T1 bajo:** documentación, UI acotada y mantenimiento mecánico.
+- **T2 medio:** cambios rutinarios de rutas/componentes, pruebas y refactors acotados.
+- **T3 alto:** dinero, auditoría, autorización/RLS, migraciones, seguridad, concurrencia y arquitectura.
+- Para T3 se recomienda revisión independiente con otra herramienta/modelo cuando esté disponible. No sustituye la puerta humana prevista por el repo.
+- Sin fallback automático: ante límite o fallo, checkpoint y consulta humana antes de cambiar proveedor/modelo o esfuerzo.
+- Permisos/sandbox son controles de la herramienta, no consecuencia del nivel de esfuerzo.
