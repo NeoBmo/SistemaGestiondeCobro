@@ -1,5 +1,7 @@
 # 04 — Plan de implementación
 
+> **Estado reportado al 2026-10-19:** F0–F6 terminadas; F7 en cierre/verificación; F8 pendiente. Este estado es informativo: cada fase se cierra solo al satisfacer su criterio de salida y pruebas. F8 está bloqueada por decisiones abiertas en `05-PENDIENTES.md`.
+
 Se construye de adentro hacia afuera: **seguridad y datos → reglas financieras → operación de cobranza → visualización y soporte → endurecimiento y lanzamiento.** No se empieza por el dashboard ni por una UI completa.
 
 Reglas de ejecución:
