@@ -1,10 +1,11 @@
 import type { Pool } from "pg";
 import { withTransaction, type Tx } from "@/shared/database/with-transaction";
-import type { SessionContext } from "@/modules/identity/session";
 import { recordAuditEvent } from "./record-audit-event";
 
+type RejectedActor = { userId: string; role: string };
+
 export type RejectedAttempt = {
-  actor: SessionContext;
+  actor: RejectedActor;
   businessId: string;
   /** El evento que se habría generado si el comando se hubiera aplicado. */
   action: string;

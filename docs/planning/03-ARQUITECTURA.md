@@ -1,6 +1,6 @@
 # 03 — Arquitectura técnica
 
-> **Estado: adoptada; F0 aún no iniciada.** Es la base sobre la que se construyó `04-PLAN.md`. No se re-discute salvo que una fase posterior demuestre que una pieza concreta no alcanza — en ese caso se documenta el cambio aquí mismo, no se decide en silencio dentro del código.
+> **Estado: adoptada e implementada como base del sistema (2026-10-19).** Es la base sobre la que se construyó `04-PLAN.md`. Los criterios aún abiertos de fases posteriores no se consideran decisiones adoptadas. Un cambio arquitectónico se registra aquí o en un ADR; no se decide en silencio dentro del código.
 
 **Decisión central:** monolito modular. Una aplicación web, una base de datos relacional, límites internos claros entre módulos. Sin microservicios, colas, caché distribuida ni app móvil nativa en V1.
 
@@ -50,6 +50,8 @@ src/
 
 Cada módulo contiene sus tipos, validaciones, servicios, consultas y pruebas. **Una página no calcula interés, mora, saldos ni permisos: llama al servicio del módulo correspondiente.**
 
+Los imports entre `src/modules/*` siguen la allowlist de `scripts/check-module-boundaries.mjs`. Los módulos no importan `src/app`; la capa de interfaz depende de los módulos, no al revés. El guard de CI detecta dependencias nuevas fuera de lista y ciclos de imports.
+
 **Convención de nombres:** código y base de datos en inglés (`snake_case` en BD, `camelCase` en TS); documentación y UI en español. La correspondencia término de dominio → identificador vive en `08-GLOSARIO.md`.
 
 ## 3. Patrón obligatorio para operaciones financieras
@@ -81,7 +83,6 @@ Reglas de implementación:
 - **Concurrencia:** cada comando toma bloqueos explícitos dentro de la transacción — `SELECT … FOR UPDATE` sobre el préstamo y sus cuotas (pagos, reversos, refinanciación) y un bloqueo consultivo (`pg_advisory_xact_lock`) por negocio+caja para todo movimiento que dependa del saldo de Caja Mayor (desembolsos, fondos, liquidaciones), siempre en el mismo orden para evitar interbloqueos.
 - **Idempotencia:** tabla `idempotency_keys`, única por (`business_id`, comando, clave); guarda hash del payload y resultado. Misma clave y mismo hash → se devuelve el resultado guardado sin volver a ejecutar; misma clave y hash distinto → 409. La clave la genera el cliente por intento de usuario y se mantiene estable entre reintentos.
 - **Sistemas distintos:** crear un usuario en Supabase Auth y la transacción de BD no son atómicos entre sí. Orden obligatorio: crear en Auth → transacción de BD → si falla, compensar borrando el usuario de Auth.
-- **Ejecutor:** los comandos sobre Caja Mayor pasan por `runCashCommand` (`src/modules/cash/run-cash-command.ts`), que autoriza, abre la transacción, toma el bloqueo de la caja, aplica la idempotencia, exige y registra la auditoría y guarda el resultado; un comando solo aporta su `execute`.
 - **Ejecutor:** los comandos sobre Caja Mayor pasan por `runCashCommand` (`src/modules/cash/run-cash-command.ts`), que autoriza, abre la transacción, toma el bloqueo de la caja, aplica la idempotencia, exige y registra la auditoría y guarda el resultado; un comando solo aporta su `execute`.
 - Fechas en UTC; cada negocio muestra fecha/hora en su zona configurada.
 - Reversos y ajustes son eventos nuevos enlazados al original.

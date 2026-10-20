@@ -25,6 +25,8 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
+      - run: npm run check:agent-instructions
+      - run: npm run check:module-boundaries
       - run: npm run format:check
       - run: npm run typecheck
       - run: npm run lint

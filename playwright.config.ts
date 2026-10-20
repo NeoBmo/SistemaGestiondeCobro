@@ -18,6 +18,7 @@ if (supabase) {
 }
 
 const e2eEnv = {
+  PUBLIC_SITE_URL: "https://example.invalid",
   NEXT_PUBLIC_SUPABASE_URL: supabase?.url ?? "http://127.0.0.1:54321",
   NEXT_PUBLIC_SUPABASE_ANON_KEY: supabase?.anonKey ?? "e2e-anon-key",
   SUPABASE_SERVICE_ROLE_KEY: supabase?.serviceRoleKey ?? "e2e-service-role-key",
@@ -29,10 +30,16 @@ export default defineConfig({
   testDir: "./src/tests/e2e",
   // Con todos los recorridos en paralelo (y next dev compilando), los 5 s por defecto se quedan cortos.
   expect: { timeout: 15_000 },
-  fullyParallel: true,
+  // journeys, payments y portfolio comparten un único Postgres y su purge() desactiva triggers de
+  // forma global, así que en paralelo se pisan. workers: 1 es correctitud, no rendimiento: mismo
+  // criterio que ya aplica vitest.integration.config.mts (fileParallelism: false).
+  workers: 1,
+  fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
-  reporter: process.env.CI ? [["github"], ["html", { open: "never" }]] : "list",
+  reporter: process.env.CI
+    ? [["github"], ["html", { open: "never" }]]
+    : [["list"], ["html", { open: "never" }]],
   use: { baseURL, trace: "on-first-retry" },
   projects: [
     { name: "desktop", use: { ...devices["Desktop Chrome"] } },
@@ -40,7 +47,7 @@ export default defineConfig({
     { name: "mobile", use: { ...devices["Pixel 7"] } },
   ],
   webServer: {
-    command: `npm run build && npm run start -- --hostname 127.0.0.1 --port ${PORT}`,
+    command: `npm run build -- --webpack && npm run start -- --hostname 127.0.0.1 --port ${PORT}`,
     url: `${baseURL}/api/health`,
     env: e2eEnv,
     reuseExistingServer: !process.env.CI,
