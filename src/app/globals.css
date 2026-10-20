@@ -1,36 +1,118 @@
 @import "tailwindcss";
 
-/*
- * Tokens semánticos (frontend-design.md §6): se definen aquí una sola vez y se
- * reutilizan en todo el proyecto. Contraste AA verificado sobre fondo blanco:
- * foreground 17.7:1, muted 7.6:1, success 5.0:1, warning 5.0:1, danger 6.5:1.
- * El color nunca es el único portador de significado: siempre va con texto o ícono.
- */
-@theme {
-  --color-background: #ffffff;
-  --color-surface: #f3f4f6;
-  --color-foreground: #111827;
-  --color-muted: #4b5563;
-  --color-border: #6b7280;
-  --color-primary: #1d4ed8;
-  --color-primary-foreground: #ffffff;
-  --color-focus: #1d4ed8;
+:root {
+  color-scheme: light;
+  --space-unit: 0.25rem;
+  --radius-base: 0rem;
 
-  --color-success: #15803d;
-  --color-success-subtle: #dcfce7;
-  --color-success-strong: #166534;
-  --color-warning: #b45309;
-  --color-warning-subtle: #fef3c7;
-  --color-warning-strong: #92400e;
-  --color-danger: #b91c1c;
-  --color-danger-subtle: #fee2e2;
-  --color-danger-strong: #991b1b;
+  --theme-background: #f6fbf9;
+  --theme-surface: #ffffff;
+  --theme-surface-2: #eff5f2;
+  --theme-border: #d9e0dd;
+  --theme-border-strong: #8d9692;
+  --theme-foreground: #111e19;
+  --theme-muted: #67726d;
+  --theme-primary: #00674f;
+  --theme-primary-hover: #005742;
+  --theme-primary-subtle: #e6efeb;
+  --theme-on-primary: #ffffff;
+
+  --theme-success: #007f38;
+  --theme-success-subtle: #e0f7e4;
+  --theme-warning: #8f6500;
+  --theme-warning-subtle: #fdeed6;
+  --theme-danger: #c9302d;
+  --theme-danger-subtle: #ffebe8;
+  --theme-info: #2470b5;
+  --theme-info-subtle: #e5f2ff;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --theme-background: #0a100e;
+    --theme-surface: #111815;
+    --theme-surface-2: #1a211e;
+    --theme-border: #2b322f;
+    --theme-border-strong: #5d6662;
+    --theme-foreground: #e8f1ed;
+    --theme-muted: #7e8985;
+    --theme-primary: #3f9278;
+    --theme-primary-hover: #4fa187;
+    --theme-primary-subtle: #073125;
+    --theme-on-primary: #06120e;
+
+    --theme-success: #4cb86a;
+    --theme-success-subtle: #122d19;
+    --theme-warning: #cb9317;
+    --theme-warning-subtle: #332305;
+    --theme-danger: #ff655a;
+    --theme-danger-subtle: #3b1c19;
+    --theme-info: #5aa3ec;
+    --theme-info-subtle: #12283e;
+  }
+}
+
+@theme inline {
+  --color-background: var(--theme-background);
+  --color-surface: var(--theme-surface);
+  --color-surface-2: var(--theme-surface-2);
+  --color-border: var(--theme-border);
+  --color-border-strong: var(--theme-border-strong);
+  --color-foreground: var(--theme-foreground);
+  --color-muted: var(--theme-muted);
+  --color-primary: var(--theme-primary);
+  --color-primary-hover: var(--theme-primary-hover);
+  --color-primary-subtle: var(--theme-primary-subtle);
+  --color-primary-foreground: var(--theme-on-primary);
+  --color-focus: var(--theme-primary);
+
+  --color-success: var(--theme-success);
+  --color-success-subtle: var(--theme-success-subtle);
+  --color-success-strong: var(--theme-success);
+  --color-warning: var(--theme-warning);
+  --color-warning-subtle: var(--theme-warning-subtle);
+  --color-warning-strong: var(--theme-warning);
+  --color-danger: var(--theme-danger);
+  --color-danger-subtle: var(--theme-danger-subtle);
+  --color-danger-strong: var(--theme-danger);
+  --color-danger-foreground: var(--theme-on-primary);
+  --color-info: var(--theme-info);
+  --color-info-subtle: var(--theme-info-subtle);
+  --color-info-strong: var(--theme-info);
+
+  --font-sans: var(--font-brand-sans);
+  --font-mono: var(--font-brand-mono);
+  --spacing: var(--space-unit);
+  --radius-xs: var(--radius-base);
+  --radius-sm: var(--radius-base);
+  --radius-md: var(--radius-base);
+  --radius-lg: var(--radius-base);
+  --radius-xl: var(--radius-base);
+  --radius-2xl: var(--radius-base);
+  --radius-3xl: var(--radius-base);
+  --radius-4xl: var(--radius-base);
+
+  --text-12: 0.75rem;
+  --text-14: 0.875rem;
+  --text-16: 1rem;
+  --text-20: 1.25rem;
+  --text-24: 1.5rem;
+  --text-32: 2rem;
+  --text-40: 2.5rem;
+
+  --duration-fast: 150ms;
+  --duration-base: 200ms;
+  --duration-slow: 250ms;
+  --ease-out-brand: cubic-bezier(0.2, 0, 0, 1);
+  --ease-settle: cubic-bezier(0.34, 1.3, 0.64, 1);
 }
 
 @layer base {
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
+    font-family: var(--font-brand-sans), sans-serif;
   }
 
   :focus-visible {

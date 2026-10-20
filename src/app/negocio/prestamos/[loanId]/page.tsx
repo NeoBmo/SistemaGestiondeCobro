@@ -43,12 +43,15 @@ export default async function LoanPage({ params }: { params: Promise<{ loanId: s
 
   return (
     <CashFeedbackProvider>
-      <Link href={`/negocio/clientes/${loan.client.id}`} className="text-primary text-sm underline">
+      <Link
+        href={`/negocio/clientes/${loan.client.id}`}
+        className="text-primary text-sm break-words underline"
+      >
         ← {loan.client.name}
       </Link>
       <div className="mt-2 flex flex-wrap items-center gap-3">
         <h1 className="text-2xl font-semibold md:text-3xl">Contrato {loan.contractNumber}</h1>
-        <span className="border-border bg-surface inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-sm font-medium">
+        <span className="border-border bg-surface inline-flex items-center gap-1 rounded-sm border px-2 py-1 text-xs font-medium">
           <span aria-hidden="true">{STATUS_BADGE[loan.status].icon}</span>
           {STATUS_BADGE[loan.status].label}
         </span>
@@ -95,7 +98,7 @@ export default async function LoanPage({ params }: { params: Promise<{ loanId: s
         <h2 id="resumen" className="text-xl font-semibold">
           Resumen
         </h2>
-        <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
+        <dl className="mt-3 grid grid-cols-1 gap-x-4 gap-y-1 sm:grid-cols-[auto_minmax(0,1fr)]">
           <dt className="text-muted">Monto prestado</dt>
           <dd className="font-mono tabular-nums">{formatMoney(loan.principal)}</dd>
           <dt className="text-muted">Interés ({percent(loan.interestBps)})</dt>
@@ -129,7 +132,7 @@ export default async function LoanPage({ params }: { params: Promise<{ loanId: s
           <h2 id="saldos" className="text-xl font-semibold">
             Saldos
           </h2>
-          <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
+          <dl className="mt-3 grid grid-cols-1 gap-x-4 gap-y-1 sm:grid-cols-[auto_minmax(0,1fr)]">
             <dt className="text-muted">Saldo pendiente</dt>
             <dd className="font-mono font-semibold tabular-nums">
               {formatMoney(loan.pendingBalance)}
@@ -207,7 +210,7 @@ export default async function LoanPage({ params }: { params: Promise<{ loanId: s
               <span className="font-medium">
                 Cuota {installment.number} · {formatIsoDate(installment.dueOn)}
               </span>
-              <dl className="grid w-full grid-cols-3 gap-2 text-sm">
+              <dl className="grid w-full grid-cols-1 gap-2 text-sm sm:grid-cols-3">
                 <div>
                   <dt className="text-muted">Esperado</dt>
                   <dd className="font-mono tabular-nums">{formatMoney(installment.amount)}</dd>

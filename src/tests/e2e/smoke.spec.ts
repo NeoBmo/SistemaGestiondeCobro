@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import AxeBuilder from "@axe-core/playwright";
 
 // Humo sin Supabase real: el entorno de Playwright usa URLs ficticias. Sin cookies de sesión ninguna
 // página hace llamadas de red, así que las redirecciones y las páginas públicas se pueden probar aquí.
@@ -51,6 +52,54 @@ test("la landing muestra los tres planes sin cifras de precio", async ({ page })
   );
 });
 
+test("el tema de la landing sigue la preferencia clara u oscura del dispositivo", async ({
+  page,
+}) => {
+  await page.emulateMedia({ colorScheme: "light" });
+  await page.goto("/");
+
+  await expect(page.locator("html")).toHaveCSS("color-scheme", "light");
+  await expect(page.locator("body")).toHaveCSS("background-color", "rgb(246, 251, 249)");
+  await expect(page.locator("body")).toHaveCSS("color", "rgb(17, 30, 25)");
+  await expect(page.locator("body")).toHaveCSS("font-family", /brandSans/);
+  const brandFontLoaded = await page.evaluate(async () => {
+    await document.fonts.ready;
+    return [...document.fonts].some(
+      (font) => font.family.includes("brandSans") && font.status === "loaded",
+    );
+  });
+  expect(brandFontLoaded).toBe(true);
+  const brandLink = page.getByRole("link", { name: "Cuadre" });
+  await expect(brandLink).toBeVisible();
+  await expect(brandLink.locator('[aria-hidden="true"]')).toHaveCSS(
+    "background-color",
+    "rgb(0, 103, 79)",
+  );
+  await expect(page.locator('head link[rel="icon"]')).toHaveAttribute("href", /icon/);
+  await expect(page.getByRole("link", { name: "Iniciar sesión" }).first()).toHaveCSS(
+    "background-color",
+    "rgb(0, 103, 79)",
+  );
+
+  await page.emulateMedia({ colorScheme: "dark" });
+
+  await expect(page.locator("html")).toHaveCSS("color-scheme", "dark");
+  await expect(page.locator("body")).toHaveCSS("background-color", "rgb(10, 16, 14)");
+  await expect(page.locator("body")).toHaveCSS("color", "rgb(232, 241, 237)");
+  await expect(brandLink.locator('[aria-hidden="true"]')).toHaveCSS(
+    "background-color",
+    "rgb(63, 146, 120)",
+  );
+  await expect(page.getByRole("link", { name: "Iniciar sesión" }).first()).toHaveCSS(
+    "background-color",
+    "rgb(63, 146, 120)",
+  );
+
+  await page.goto("/login");
+  await expect(page.getByLabel("Usuario")).toHaveCSS("background-color", "rgb(17, 24, 21)");
+  await expect(page.getByLabel("Usuario")).toHaveCSS("border-top-color", "rgb(93, 102, 98)");
+});
+
 test("el formulario de login tiene etiquetas asociadas y se envía con el teclado", async ({
   page,
 }) => {
@@ -96,17 +145,41 @@ test("«Saltar al contenido» es el primer foco del teclado y se hace visible", 
   await expect(skipLink).toBeVisible();
 });
 
-test("las páginas públicas no provocan scroll horizontal en el viewport actual", async ({
+test("las páginas públicas son utilizables a 360, 768 y 1280 px", async ({ page }, testInfo) => {
+  for (const width of [360, 768, 1280]) {
+    await page.setViewportSize({ width, height: 900 });
+
+    for (const { path, heading } of publicPages) {
+      await page.goto(path);
+      await expect(page.getByRole("heading", { level: 1, name: heading })).toBeVisible();
+
+      const overflows = await page.evaluate(
+        () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+      );
+      expect(overflows, `${path} presenta overflow horizontal a ${width}px`).toBe(false);
+
+      await testInfo.attach(`viewport-${width}-${path === "/" ? "landing" : "login"}`, {
+        body: await page.screenshot({ fullPage: true }),
+        contentType: "image/png",
+      });
+    }
+  }
+});
+
+test("prefers-reduced-motion reduce las transiciones y conserva el foco visible", async ({
   page,
 }) => {
-  for (const { path } of publicPages) {
-    await page.goto(path);
-    const overflows = await page.evaluate(
-      () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
-    );
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/login");
+  await page.keyboard.press("Tab");
 
-    expect(overflows, path).toBe(false);
-  }
+  const skipLink = page.getByRole("link", { name: "Saltar al contenido" });
+  await expect(skipLink).toBeFocused();
+
+  const reducedTransition = await page
+    .getByRole("button", { name: "Iniciar sesión" })
+    .evaluate((element) => Number.parseFloat(getComputedStyle(element).transitionDuration));
+  expect(reducedTransition).toBeLessThanOrEqual(0.001);
 });
 
 test("los botones y enlaces principales miden al menos 44×44 px", async ({ page }) => {
@@ -120,4 +193,60 @@ test("los botones y enlaces principales miden al menos 44×44 px", async ({ page
     expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
     expect(box?.width ?? 0).toBeGreaterThanOrEqual(44);
   }
+});
+
+test("la landing y login no tienen violaciones axe WCAG 2.1 AA", async ({ page }) => {
+  for (const path of ["/", "/login"]) {
+    await page.goto(path);
+    const results = await new AxeBuilder({ page })
+      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+      .analyze();
+    expect(
+      results.violations.map(({ id, impact, help }) => ({ id, impact, help })),
+      `${path} presenta hallazgos axe`,
+    ).toEqual([]);
+  }
+});
+
+test("la metadata pública y las rutas de rastreo conservan su contrato", async ({
+  page,
+  request,
+}) => {
+  await page.goto("/");
+  await expect(page).toHaveTitle("Cuadre");
+  await expect(page.locator('meta[name="description"]')).toHaveAttribute(
+    "content",
+    "Gestión de cobros con trazabilidad financiera completa.",
+  );
+  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
+    "href",
+    "https://example.invalid",
+  );
+  await expect(page.locator('meta[property="og:title"]')).toHaveAttribute("content", "Cuadre");
+  await expect(page.locator('meta[property="og:url"]')).toHaveAttribute(
+    "content",
+    "https://example.invalid",
+  );
+
+  for (const path of ["/login", "/cambiar-contrasena"]) {
+    await page.goto(path);
+    await expect(page.locator('meta[name="robots"]')).toHaveAttribute(
+      "content",
+      /noindex,\s*nofollow/,
+    );
+  }
+
+  const [robotsResponse, sitemapResponse] = await Promise.all([
+    request.get("/robots.txt"),
+    request.get("/sitemap.xml"),
+  ]);
+  expect(robotsResponse.status()).toBe(200);
+  expect(await robotsResponse.text()).toContain("Sitemap: https://example.invalid/sitemap.xml");
+  expect(await robotsResponse.text()).not.toMatch(
+    /Disallow:\s*\/(?:login|negocio|cobrador|super-admin)/i,
+  );
+  expect(sitemapResponse.status()).toBe(200);
+  const sitemap = await sitemapResponse.text();
+  expect(sitemap).toContain("<loc>https://example.invalid/</loc>");
+  expect(sitemap).not.toMatch(/<loc>[^<]*\/(?:login|negocio|cobrador|super-admin)/i);
 });

@@ -70,7 +70,7 @@ export default async function PortfolioPage({
             type="search"
             defaultValue={filters.search ?? ""}
             placeholder="Nombre o identificación"
-            className="border-border bg-background min-h-11 rounded-lg border px-3"
+            className="border-border-strong bg-surface min-h-11 rounded-lg border px-3"
           />
         </div>
         <div className="flex flex-col gap-1">
@@ -81,7 +81,7 @@ export default async function PortfolioPage({
             id="estado"
             name="estado"
             defaultValue={filters.status ?? ""}
-            className="border-border bg-background min-h-11 rounded-lg border px-3"
+            className="border-border-strong bg-surface min-h-11 rounded-lg border px-3"
           >
             <option value="">Todos</option>
             {PORTFOLIO_STATUSES.map((status) => (
@@ -99,7 +99,7 @@ export default async function PortfolioPage({
             id="cobrador"
             name="cobrador"
             defaultValue={filters.collectorId ?? ""}
-            className="border-border bg-background min-h-11 rounded-lg border px-3"
+            className="border-border-strong bg-surface min-h-11 rounded-lg border px-3"
           >
             <option value="">Todos</option>
             {collectors.map((collector) => (
@@ -117,7 +117,7 @@ export default async function PortfolioPage({
             id="ruta"
             name="ruta"
             defaultValue={filters.routeId ?? ""}
-            className="border-border bg-background min-h-11 rounded-lg border px-3"
+            className="border-border-strong bg-surface min-h-11 rounded-lg border px-3"
           >
             <option value="">Todas</option>
             {routes.map((route) => (
@@ -162,7 +162,7 @@ export default async function PortfolioPage({
                 >
                   {row.name}
                 </Link>
-                <span className="border-border bg-surface inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-sm font-medium">
+                <span className="border-border bg-surface inline-flex items-center gap-1 rounded-sm border px-2 py-1 text-xs font-medium">
                   <span aria-hidden="true">{STATUS_ICON[row.status]}</span>
                   {PORTFOLIO_STATUS_LABEL[row.status]}
                   {row.maxDaysLate > 0

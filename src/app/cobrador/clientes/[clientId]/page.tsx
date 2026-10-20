@@ -46,7 +46,10 @@ export default async function CollectorClientPage({
 
   return (
     <CashFeedbackProvider>
-      <Link href="/cobrador" className="text-primary text-sm underline">
+      <Link
+        href="/cobrador"
+        className="text-primary inline-flex min-h-11 items-center text-sm underline"
+      >
         ← Mi ruta
       </Link>
       <h1 className="mt-2 text-2xl font-semibold break-words">{client.name}</h1>
@@ -162,7 +165,7 @@ export default async function CollectorClientPage({
                     ? `No se pudo cobrar: ${REASON_LABEL[attempt.reason ?? ""] ?? attempt.reason}`
                     : "Volver a cobrar"}
                 </p>
-                <p className="text-muted">
+                <p className="text-muted break-words">
                   {formatDateTimeInZone(attempt.createdAt, timeZone)}
                   {attempt.retryAt
                     ? ` · volver el ${formatDateTimeInZone(attempt.retryAt, timeZone)}`

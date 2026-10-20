@@ -27,7 +27,7 @@ export default async function RoutePage({ params }: { params: Promise<{ routeId:
         ← Rutas
       </Link>
       <h1 className="mt-2 text-2xl font-semibold break-words md:text-3xl">{route.name}</h1>
-      <p className="text-muted text-sm">
+      <p className="text-muted text-sm break-words">
         Cobrador {route.collector.name} · {route.status === "ACTIVA" ? "Activa" : "Cerrada"}
       </p>
       {route.status === "ACTIVA" ? (
@@ -48,11 +48,14 @@ export default async function RoutePage({ params }: { params: Promise<{ routeId:
           <ul className="mt-3 flex flex-col gap-2">
             {route.clients.map((client) => (
               <li key={client.id} className="border-border rounded-lg border p-3">
-                <Link href={`/negocio/clientes/${client.id}`} className="text-primary underline">
+                <Link
+                  href={`/negocio/clientes/${client.id}`}
+                  className="text-primary break-words underline"
+                >
                   {client.name}
                 </Link>
                 <p className="text-muted text-sm">
-                  {client.identification} · desde{" "}
+                  <span className="break-all">{client.identification}</span> · desde{" "}
                   {formatDateTimeInZone(client.assignedAt, timeZone)}
                 </p>
               </li>

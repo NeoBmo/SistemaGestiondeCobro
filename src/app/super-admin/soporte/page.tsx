@@ -14,7 +14,7 @@ import { PRIORITY_LABEL, STATUS_LABEL, TicketBadges } from "../../_components/ti
 
 export const metadata: Metadata = { title: "Soporte" };
 
-const controlClass = "border-border bg-background min-h-11 rounded-lg border px-3 font-normal";
+const controlClass = "border-border-strong bg-surface min-h-11 rounded-lg border px-3 font-normal";
 
 export default async function SupportPage({
   searchParams,
@@ -62,7 +62,7 @@ export default async function SupportPage({
         <div className="flex items-end gap-3">
           <button
             type="submit"
-            className="border-border bg-background hover:bg-surface inline-flex min-h-11 items-center rounded-lg border px-4 font-medium"
+            className="border-border-strong bg-surface hover:bg-surface-2 inline-flex min-h-11 items-center rounded-lg border px-4 font-medium"
           >
             Filtrar
           </button>

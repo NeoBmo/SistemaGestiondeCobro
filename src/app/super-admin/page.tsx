@@ -16,7 +16,7 @@ export const metadata: Metadata = { title: "Negocios" };
 
 const buttonBase =
   "inline-flex min-h-11 items-center justify-center rounded-lg border px-4 py-2 text-base font-medium";
-const controlClass = "border-border bg-background min-h-11 rounded-lg border px-3 font-normal";
+const controlClass = "border-border-strong bg-surface min-h-11 rounded-lg border px-3 font-normal";
 
 export default async function SuperAdminPage({
   searchParams,
@@ -78,7 +78,7 @@ export default async function SuperAdminPage({
         <div className="flex items-end gap-3">
           <button
             type="submit"
-            className={`${buttonBase} border-border bg-background hover:bg-surface`}
+            className={`${buttonBase} border-border-strong bg-surface hover:bg-surface-2`}
           >
             Filtrar
           </button>
@@ -114,29 +114,31 @@ export default async function SuperAdminPage({
                 <h2 className="text-lg font-medium">
                   <Link
                     href={`/super-admin/negocios/${business.id}`}
-                    className="text-primary underline"
+                    className="text-primary break-words underline"
                   >
                     {business.name}
                   </Link>
                 </h2>
                 <StatusBadge status={business.status} />
               </div>
-              <dl className="text-muted mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
+              <dl className="text-muted mt-2 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-sm">
                 <dt>Responsable</dt>
-                <dd className="text-foreground">{business.ownerName}</dd>
+                <dd className="text-foreground min-w-0 break-words">{business.ownerName}</dd>
                 <dt>Plan</dt>
-                <dd className="text-foreground">{business.planName}</dd>
+                <dd className="text-foreground min-w-0 break-words">{business.planName}</dd>
                 <dt>Vence</dt>
                 <dd className="text-foreground">{formatIsoDate(business.expiresOn)}</dd>
                 <dt>Cobradores</dt>
-                <dd className="text-foreground" data-testid="cobradores">
+                <dd className="text-foreground min-w-0 break-words" data-testid="cobradores">
                   {business.activeCollectors} activos
                   {business.collectorLimit === null
                     ? " (sin límite)"
                     : ` de ${business.collectorLimit}`}
                 </dd>
                 <dt>Administrador</dt>
-                <dd className="text-foreground">{business.adminUsername ?? "—"}</dd>
+                <dd className="text-foreground min-w-0 break-all">
+                  {business.adminUsername ?? "—"}
+                </dd>
               </dl>
             </li>
           ))}

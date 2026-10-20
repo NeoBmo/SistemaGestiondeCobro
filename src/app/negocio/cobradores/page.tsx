@@ -46,13 +46,13 @@ export default async function CollectorsPage() {
             >
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-lg font-medium break-words">{collector.name}</p>
-                <span className="border-border bg-surface inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-sm font-medium">
+                <span className="border-border bg-surface inline-flex items-center gap-1 rounded-sm border px-2 py-1 text-xs font-medium">
                   <span aria-hidden="true">{collector.status === "ACTIVO" ? "✓" : "▣"}</span>
                   {collector.status === "ACTIVO" ? "Activo" : "Inactivo"}
                 </span>
               </div>
-              <p className="text-muted text-sm">
-                Usuario: <span className="font-mono">{collector.username}</span> ·{" "}
+              <p className="text-muted text-sm break-words">
+                Usuario: <span className="font-mono break-all">{collector.username}</span> ·{" "}
                 {collector.activeRoute ? (
                   <Link
                     href={`/negocio/rutas/${collector.activeRoute.id}`}

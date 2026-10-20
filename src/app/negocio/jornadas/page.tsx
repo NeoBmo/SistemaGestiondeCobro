@@ -51,7 +51,7 @@ export default async function SessionsPage() {
                 <p className="text-lg font-medium break-words">
                   {item.collector.name} · {formatIsoDate(isoDate(item.businessDate))}
                 </p>
-                <span className="border-border bg-surface inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-sm font-medium">
+                <span className="border-border bg-surface inline-flex items-center gap-1 rounded-sm border px-2 py-1 text-xs font-medium">
                   <span aria-hidden="true">{STATUS[item.status].icon}</span>
                   {STATUS[item.status].label}
                 </span>
@@ -93,7 +93,7 @@ export default async function SessionsPage() {
                     ) : null}
                   </p>
                   {item.settlement.difference ? (
-                    <p className="mt-1 font-medium">
+                    <p className="mt-1 font-medium break-words">
                       <span aria-hidden="true">⚠ </span>
                       {item.settlement.difference > 0 ? "Faltante" : "Sobrante"} de{" "}
                       <span className="font-mono tabular-nums">

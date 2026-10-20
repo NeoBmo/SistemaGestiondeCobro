@@ -13,7 +13,7 @@ export function StatusBadge({ status }: { status: SubscriptionStatus }) {
   const { label, icon, tone } = STATUS_PRESENTATION[status];
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-sm font-medium ${TONES[tone]}`}
+      className={`inline-flex items-center gap-1 rounded-sm border px-2 py-1 text-xs font-medium ${TONES[tone]}`}
     >
       <span aria-hidden="true">{icon}</span>
       {label}

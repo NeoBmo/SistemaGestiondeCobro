@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import type { Role, SessionContext } from "@/modules/identity/session";
+import { BrandMark } from "./brand-mark";
 import { LogoutButton } from "./logout-button";
 
 const ROLE_LABEL: Record<Role, string> = {
@@ -25,11 +26,12 @@ export function PrivateShell({ area, session, widthClass = "max-w-7xl", children
         <div
           className={`mx-auto flex w-full flex-wrap items-center justify-between gap-3 px-4 py-3 ${widthClass}`}
         >
-          <p className="text-lg font-semibold">
+          <p className="inline-flex min-w-0 flex-wrap items-center gap-2 text-lg font-semibold break-words">
+            <BrandMark />
             Cuadre <span className="text-muted font-normal">· {area}</span>
           </p>
-          <div className="flex items-center gap-3">
-            <p className="text-sm">
+          <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
+            <p className="min-w-0 text-sm break-words">
               <span className="font-medium">{session.displayName}</span>
               <span className="text-muted"> · {ROLE_LABEL[session.role]}</span>
             </p>

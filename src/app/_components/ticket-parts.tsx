@@ -24,7 +24,7 @@ export function TicketBadges({
   priority: TicketPriority;
 }) {
   const box =
-    "border-border bg-surface inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-sm font-medium";
+    "border-border bg-surface inline-flex items-center gap-1 rounded-sm border px-2 py-1 text-xs font-medium";
   return (
     <span className="flex flex-wrap gap-2">
       <span className={box}>

@@ -30,7 +30,7 @@ export function TextField({ label, hint, error, className = "", ...input }: Prop
         id={id}
         aria-invalid={error ? true : undefined}
         aria-describedby={describedBy || undefined}
-        className={`border-border bg-background min-h-11 rounded-lg border px-3 text-base ${error ? "border-danger" : ""} ${className}`}
+        className={`border-border-strong bg-surface min-h-11 rounded-lg border px-3 text-base ${error ? "border-danger" : ""} ${className}`}
       />
       {error ? (
         <p id={errorId} aria-live="polite" className="text-danger-strong text-sm">

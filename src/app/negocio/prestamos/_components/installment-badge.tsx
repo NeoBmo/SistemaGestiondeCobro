@@ -33,7 +33,7 @@ export function InstallmentBadge({
   const style = STYLES[status];
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-sm font-medium ${style.box}`}
+      className={`inline-flex items-center gap-1 rounded-sm border px-2 py-1 text-xs font-medium ${style.box}`}
     >
       <span aria-hidden="true">{style.icon}</span>
       {style.label}

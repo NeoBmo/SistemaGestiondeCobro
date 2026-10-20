@@ -34,7 +34,7 @@ export default async function BusinessPage({
         ← Negocios
       </Link>
       <div className="mt-2 flex flex-wrap items-center gap-3">
-        <h1 className="text-2xl font-semibold md:text-3xl">{business.name}</h1>
+        <h1 className="text-2xl font-semibold break-words md:text-3xl">{business.name}</h1>
         <StatusBadge status={business.status} />
       </div>
       <p className="text-muted mt-1 text-sm">{ACCESS_LABEL[business.accessStatus]}</p>
@@ -48,17 +48,17 @@ export default async function BusinessPage({
         <h2 id="datos" className="text-xl font-semibold">
           Datos
         </h2>
-        <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-base">
+        <dl className="mt-2 grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1 text-base">
           <dt className="text-muted">Responsable</dt>
-          <dd>{business.ownerName}</dd>
+          <dd className="min-w-0 break-words">{business.ownerName}</dd>
           <dt className="text-muted">Identificación</dt>
-          <dd>{business.ownerIdentification}</dd>
+          <dd className="min-w-0 break-all">{business.ownerIdentification}</dd>
           <dt className="text-muted">Teléfono</dt>
-          <dd>{business.phone}</dd>
+          <dd className="min-w-0 break-all">{business.phone}</dd>
           <dt className="text-muted">Zona horaria</dt>
           <dd>{business.timeZone}</dd>
           <dt className="text-muted">Administrador</dt>
-          <dd>
+          <dd className="min-w-0 break-words">
             {business.admin
               ? `${business.admin.displayName} (${business.admin.username}) · ${ADMIN_STATUS_LABEL[business.admin.status]}`
               : "Sin cuenta administrativa"}
