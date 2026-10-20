@@ -1,0 +1,12 @@
+# Propiedad de revisión; requiere protección de rama para ser obligatoria.
+/src/app/** @NeoBmo
+/src/app/api/** @Lballest25
+/src/modules/** @Lballest25
+/src/shared/** @NeoBmo @Lballest25
+/supabase/** @Lballest25
+/src/tests/** @NeoBmo @Lballest25
+/docs/frontend/** @NeoBmo
+/docs/planning/** @NeoBmo @Lballest25
+/AGENTS.md @NeoBmo @Lballest25
+/CLAUDE.md @NeoBmo @Lballest25
+/.github/** @NeoBmo @Lballest25

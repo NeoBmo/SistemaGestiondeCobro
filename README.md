@@ -4,7 +4,7 @@
 
 ## Estado del proyecto
 
-🚧 **Fases F0 a F4 terminadas.** El proyecto está en el tramo de **F5 (cobradores, rutas, Caja Menor y liquidación)**: es la siguiente en la secuencia de `docs/planning/04-PLAN.md`. Quedan por delante F6, F7 y F8.
+🚧 **F0–F6 reportadas como terminadas; F7 en cierre/verificación; F8 pendiente.** Las áreas de Super Admin, soporte y monitoreo están implementadas; aún no se certifica el criterio de salida de F7. F8 no puede iniciarse hasta resolver los bloqueadores de `docs/planning/05-PENDIENTES.md`. Los criterios de salida se mantienen en `docs/planning/04-PLAN.md`.
 
 | Fase | Contenido | Estado |
 | --- | --- | --- |
@@ -13,9 +13,9 @@
 | F2 | Libro de caja y auditoría financiera | Terminada |
 | F3 | Cartera: clientes, contratos, préstamos y cuotas | Terminada |
 | F4 | Pagos, mora y refinanciación | Terminada |
-| F5 | Cobradores, rutas, Caja Menor y liquidación | Siguiente (`src/modules/collections/` está vacío) |
-| F6 | Dashboard y operación administrativa | Pendiente |
-| F7 | Super Admin, soporte y monitoreo | Pendiente (`src/modules/support/` está vacío) |
+| F5 | Cobradores, rutas, Caja Menor y liquidación | Terminada |
+| F6 | Dashboard y operación administrativa | Terminada |
+| F7 | Super Admin, soporte y monitoreo | Cierre/verificación pendiente |
 | F8 | Endurecimiento, prueba real y lanzamiento | Pendiente |
 
 ### Qué funciona hoy
@@ -24,23 +24,26 @@
 - **Super Admin:** alta de negocio con su cuenta admin inicial, detalle del negocio y acciones de activar, suspender, archivar, cambiar plan y restablecer contraseña.
 - **Negocio (admin):** Caja Mayor (saldo, registro de movimientos, reverso e historial), clientes (alta, edición auditada y búsqueda), préstamos (alta con vista previa, confirmación con desembolso y calendario de cuotas, detalle, anulación e importación de cartera previa).
 - **F4:** registro de pagos con aplicación cronológica a cuotas, historial de pagos, cargos de mora manuales (crear, pagar, anular), refinanciación y reverso de pagos.
-- **Cobrador:** solo layout y página de marcador de posición, sin funcionalidad (eso es F5).
+- **Cobrador:** área de operación de campo con rutas, clientes asignados, jornadas y cobros; experiencia orientada a móvil.
+- **F6:** dashboards y operación administrativa para cartera, cajas y alertas.
+- **F7:** áreas de Super Admin, soporte y monitoreo implementadas; criterio de salida pendiente de verificación formal.
 
 ### Estado de verificación
 
-Ejecutado en `main` (`247fa16`):
+Última verificación registrada para la preparación de tokens e identidad visual (2026-10-16):
 
 | Comando | Resultado |
 | --- | --- |
+| `npm run format:check` | Limpio |
 | `npm run typecheck` | Limpio |
 | `npm run lint` | Limpio |
-| `npm test` | 48 archivos / 272 pruebas en verde |
-| `npm run test:integration` | No ejecutado: requiere Docker (Supabase local) |
-| `npm run test:e2e` | 30 smoke en verde (desktop y móvil) sin Docker; `journeys`, `portfolio` y `payments` fallan al cargar sin Supabase local |
+| `npm test -- --pool=threads --maxWorkers=1` | 55 suites / 298 pruebas en verde |
+| `npm run build` | Build de producción completado |
+| Smoke E2E de `smoke.spec.ts` | 34 casos en desktop y móvil, sin Supabase; incluye landing/login en 360, 768 y 1280 px |
 
-> **Sin `npm run db:start`, `npm run test:e2e` falla.** Los specs con sesión real construyen sus fixtures al cargarse, antes de que `test.skip()` pueda aplicarse, y `createAdminClient()` lanza `Falta TEST_SUPABASE_URL` (el mensaje remite a `global-setup.ts`, que es de Vitest y Playwright no ejecuta). Los smoke tests sí corren sin base de datos. En CI esto no aparece: el job levanta Supabase local.
+La comprobación E2E anterior cubre smoke sin sesión y no equivale a ejecutar los recorridos con sesión real. Para la suite E2E completa, incluidos `journeys`, `portfolio` y `payments`, inicia Supabase local con `npm run db:start`; CI levanta su propia instancia local.
 
-Superficie actual: 239 archivos `.ts/.tsx` en `src/`, 52 archivos `.tsx` en `src/app/`, 21 Route Handlers, 16 migraciones en `supabase/migrations/` y 8 ADRs en `docs/adr/`. Pruebas: 48 unitarias (junto al código), 35 de integración en `src/tests/integration/` y 4 e2e (`smoke`, `portfolio`, `payments`, `journeys`).
+El repositorio contiene áreas de aplicación para páginas públicas, autenticación, negocio, cobrador y Super Admin, además de endpoints API. La spec 006 automatizó los checks frontend y E2E; queda pendiente su checklist manual AA/responsive (`docs/frontend/04-MATRIZ-VERIFICACION.md`).
 
 ### Pendientes de infraestructura
 
@@ -128,11 +131,13 @@ Base local: `npm run db:migrate` aplica migraciones nuevas y `npm run db:stop` d
 ├── docs/
 │   ├── planning/                # 01 contexto · 02 dominio · 03 arquitectura · 04 plan · 05 pendientes
 │   │                            # 06 agentes · 07 flujo de trabajo · 08 glosario
+│   ├── frontend/                # diagnóstico, plan visual y flujo frontend
 │   └── adr/                     # decisiones técnicas registradas
 ├── src/
-│   ├── app/                     # rutas por área (public, auth, super-admin, negocio, cobrador, api)
+│   ├── app/                     # rutas por área y recursos compartidos de interfaz
+│   │   └── _fonts/              # fuentes locales y licencia OFL
 │   ├── modules/                 # dominio: identity, subscriptions, portfolio, collections, cash, support, audit
-│   ├── shared/                  # errors, types, money, dates, ids, validation, database, ui, auth
+│   ├── shared/                  # errors, types, money, dates, ids, validation, database, UI y auth
 │   ├── tests/                   # unit, integration, e2e
 │   └── instrumentation.ts       # valida el entorno al arrancar
 └── supabase/                    # config local y migraciones versionadas
