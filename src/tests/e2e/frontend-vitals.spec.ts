@@ -40,17 +40,6 @@ test("landing: adjunta cinco muestras locales de LCP, INP y CLS", async ({ brows
     await page.evaluate(async () => {
       await document.fonts.ready;
     });
-    if (!reported.some((metric) => metric.name === "LCP")) {
-      const diagnostic = await page.evaluate(() => ({
-        visibility: document.visibilityState,
-        webVitalsAvailable: typeof (window as Window & { webVitals?: unknown }).webVitals,
-        reporterAvailable: typeof (window as Window & { __reportWebVital?: unknown })
-          .__reportWebVital,
-        supportsLcp: PerformanceObserver.supportedEntryTypes.includes("largest-contentful-paint"),
-        lcpEntries: performance.getEntriesByType("largest-contentful-paint").length,
-      }));
-      throw new Error(`No se recibió LCP: ${JSON.stringify(diagnostic)}`);
-    }
 
     const loginPagePromise = context.waitForEvent("page");
     await page
@@ -60,11 +49,17 @@ test("landing: adjunta cinco muestras locales de LCP, INP y CLS", async ({ brows
     const loginPage = await loginPagePromise;
     await expect(loginPage).toHaveURL(/\/login$/);
     await expect.poll(() => reported.some((metric) => metric.name === "INP")).toBe(true);
+
     const hasLayoutShift = await page.evaluate(() =>
       performance
         .getEntriesByType("layout-shift")
         .some((entry) => !(entry as PerformanceEntry & { hadRecentInput: boolean }).hadRecentInput),
     );
+
+    // web-vitals finaliza LCP/CLS cuando el documento se oculta; una navegación real
+    // fuerza pagehide. getEntriesByType no expone entradas observer-only como LCP.
+    await page.goto("/login");
+    await expect.poll(() => reported.some((metric) => metric.name === "LCP")).toBe(true);
     if (!reported.some((metric) => metric.name === "CLS")) {
       expect(hasLayoutShift, `la muestra ${index + 1} tuvo shifts pero no reportó CLS`).toBe(false);
       reported.push({ name: "CLS", value: 0, id: "sin-layout-shift" });
