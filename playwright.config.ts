@@ -23,6 +23,7 @@ const e2eEnv = {
   SUPABASE_SERVICE_ROLE_KEY: supabase?.serviceRoleKey ?? "e2e-service-role-key",
   DATABASE_URL: "postgresql://postgres:postgres@127.0.0.1:54322/postgres",
   AUTH_SYNTHETIC_EMAIL_DOMAIN: "cuadre.invalid",
+  PUBLIC_SITE_URL: "https://example.invalid",
 };
 
 export default defineConfig({

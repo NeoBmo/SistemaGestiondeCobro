@@ -30,6 +30,8 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run build
+        env:
+          PUBLIC_SITE_URL: https://example.invalid
 
   integration:
     name: Integración (Supabase local)
