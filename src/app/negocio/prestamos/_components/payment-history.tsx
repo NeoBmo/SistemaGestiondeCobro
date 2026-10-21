@@ -59,7 +59,7 @@ export function PaymentHistory({
                   {formatMoney(money(payment.amount))}
                 </span>
                 {payment.reversal ? (
-                  <span className="border-danger bg-danger-subtle text-danger-strong inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-sm font-medium">
+                  <span className="border-danger bg-danger-subtle text-danger-strong inline-flex items-center gap-1 rounded-sm border px-2 py-1 text-xs font-medium">
                     <span aria-hidden="true">↩</span>
                     Reversado
                   </span>
@@ -67,13 +67,17 @@ export function PaymentHistory({
               </div>
               <p className="text-muted text-sm break-words">
                 {payment.kind === "CARGO_MORA" ? "Pago de cargo de mora" : "Pago de cuotas"} ·{" "}
-                {payment.applications
-                  .map((line) =>
-                    line.installmentNumber === null
-                      ? `cargo ${formatMoney(money(line.amount))}`
-                      : `cuota ${line.installmentNumber}: ${formatMoney(money(line.amount))}`,
-                  )
-                  .join(" · ")}{" "}
+                {payment.applications.map((line, index) => (
+                  <span key={`${line.installmentNumber ?? "cargo"}-${index}`}>
+                    {index > 0 ? " · " : ""}
+                    {line.installmentNumber === null
+                      ? "cargo "
+                      : `cuota ${line.installmentNumber}: `}
+                    <span className="font-mono tabular-nums">
+                      {formatMoney(money(line.amount))}
+                    </span>
+                  </span>
+                ))}{" "}
                 · registrado por {payment.registeredByName}
                 {payment.note ? ` · ${payment.note}` : ""}
               </p>

@@ -45,7 +45,7 @@ export default async function SupportPage() {
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <Link
                   href={`/negocio/soporte/${ticket.id}`}
-                  className="text-primary font-medium underline"
+                  className="text-primary font-medium break-words underline"
                 >
                   {ticket.description.length > 80
                     ? `${ticket.description.slice(0, 80)}…`

@@ -28,7 +28,7 @@ export default async function ImportLoanPage({
     <>
       <Link
         href={`/negocio/clientes/${detail.client.id}`}
-        className="text-primary text-sm underline"
+        className="text-primary text-sm break-words underline"
       >
         ← {detail.client.name}
       </Link>

@@ -53,16 +53,16 @@ export default async function RoutesPage() {
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <Link
                   href={`/negocio/rutas/${route.id}`}
-                  className="text-primary text-lg font-medium underline"
+                  className="text-primary text-lg font-medium break-words underline"
                 >
                   {route.name}
                 </Link>
-                <span className="border-border bg-surface inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-sm font-medium">
+                <span className="border-border bg-surface inline-flex items-center gap-1 rounded-sm border px-2 py-1 text-xs font-medium">
                   <span aria-hidden="true">{route.status === "ACTIVA" ? "✓" : "▣"}</span>
                   {route.status === "ACTIVA" ? "Activa" : "Cerrada"}
                 </span>
               </div>
-              <p className="text-muted text-sm">
+              <p className="text-muted text-sm break-words">
                 Cobrador {route.collector.name} · desde {formatIsoDate(isoDate(route.startedOn))} ·{" "}
                 {route.clientCount} {route.clientCount === 1 ? "cliente" : "clientes"}
               </p>

@@ -4,9 +4,9 @@ import { Spinner } from "./spinner";
 type Variant = "primary" | "secondary" | "danger";
 
 const VARIANTS: Record<Variant, string> = {
-  primary: "border-transparent bg-primary text-primary-foreground hover:bg-primary/90",
-  secondary: "border-border bg-background text-foreground hover:bg-surface",
-  danger: "border-transparent bg-danger text-white hover:bg-danger-strong",
+  primary: "border-transparent bg-primary text-primary-foreground hover:bg-primary-hover",
+  secondary: "border-border-strong bg-surface text-foreground hover:bg-surface-2",
+  danger: "border-transparent bg-danger text-danger-foreground hover:opacity-90",
 };
 
 type Props = ButtonHTMLAttributes<HTMLButtonElement> & {
@@ -35,7 +35,7 @@ export function Button({
       type={type}
       disabled={disabled || loading}
       aria-busy={loading || undefined}
-      className={`inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-lg border px-4 py-2 text-base font-medium transition-colors duration-150 ease-out disabled:cursor-not-allowed disabled:opacity-60 ${VARIANTS[variant]} ${className}`}
+      className={`inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-lg border px-4 py-2 text-base font-medium transition-[opacity,transform] duration-150 ease-out active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 ${VARIANTS[variant]} ${className}`}
       {...props}
     >
       {loading ? (

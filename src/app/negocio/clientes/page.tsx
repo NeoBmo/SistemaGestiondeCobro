@@ -52,12 +52,12 @@ export default async function ClientsPage({
             defaultValue={search ?? ""}
             maxLength={120}
             placeholder="Nombre, sobrenombre, identificación o teléfono"
-            className="border-border bg-background min-h-11 rounded-lg border px-3 font-normal"
+            className="border-border-strong bg-surface min-h-11 rounded-lg border px-3 font-normal"
           />
         </label>
         <button
           type="submit"
-          className={`${buttonBase} border-border bg-background hover:bg-surface`}
+          className={`${buttonBase} border-border-strong bg-surface hover:bg-surface-2`}
         >
           Buscar
         </button>
@@ -99,11 +99,13 @@ export default async function ClientsPage({
                   <span className="text-muted font-normal"> · «{client.nickname}»</span>
                 ) : null}
               </h2>
-              <dl className="text-muted mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
+              <dl className="text-muted mt-2 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-sm">
                 <dt>Identificación</dt>
-                <dd className="text-foreground font-mono">{client.identification}</dd>
+                <dd className="text-foreground min-w-0 font-mono break-all">
+                  {client.identification}
+                </dd>
                 <dt>Teléfono</dt>
-                <dd className="text-foreground">{client.phone ?? "—"}</dd>
+                <dd className="text-foreground min-w-0 break-all">{client.phone ?? "—"}</dd>
                 <dt>Préstamos activos</dt>
                 <dd className="text-foreground">{client.activeLoans}</dd>
               </dl>

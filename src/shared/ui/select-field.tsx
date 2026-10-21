@@ -30,7 +30,7 @@ export function SelectField({ label, options, hint, error, className = "", ...se
         id={id}
         aria-invalid={error ? true : undefined}
         aria-describedby={describedBy || undefined}
-        className={`border-border bg-background min-h-11 rounded-lg border px-3 text-base ${className}`}
+        className={`border-border-strong bg-surface min-h-11 rounded-lg border px-3 text-base ${className}`}
       >
         {options.map((option) => (
           <option key={option.value} value={option.value}>

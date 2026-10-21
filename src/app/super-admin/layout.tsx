@@ -1,6 +1,11 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { getPageSession } from "@/modules/identity/page-session";
 import { PrivateShell } from "@/shared/ui/private-shell";
+
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+};
 
 export const dynamic = "force-dynamic";
 

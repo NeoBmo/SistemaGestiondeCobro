@@ -95,7 +95,7 @@ export default async function CajaMayorPage() {
                       {movement.createdByName}
                     </p>
                     {movement.reason ? (
-                      <p className="mt-1 text-sm break-words whitespace-pre-line">
+                      <p className="mt-1 text-sm wrap-break-word whitespace-pre-line">
                         Motivo: {movement.reason}
                       </p>
                     ) : null}

@@ -62,14 +62,20 @@ export function LateFees({
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="font-medium break-words">{fee.reason}</span>
                 <span className="font-mono tabular-nums">{formatMoney(money(fee.amount))}</span>
-                <span className="border-border bg-surface inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-sm font-medium">
+                <span className="border-border bg-surface inline-flex items-center gap-1 rounded-sm border px-2 py-1 text-xs font-medium">
                   <span aria-hidden="true">{STATUS[fee.status].icon}</span>
                   {STATUS[fee.status].label}
                 </span>
               </div>
               <p className="text-muted text-sm">
-                Aplicado {formatMoney(money(fee.appliedAmount))} · pendiente{" "}
-                {formatMoney(money(fee.pendingAmount))}
+                Aplicado{" "}
+                <span className="font-mono tabular-nums">
+                  {formatMoney(money(fee.appliedAmount))}
+                </span>{" "}
+                · pendiente{" "}
+                <span className="font-mono tabular-nums">
+                  {formatMoney(money(fee.pendingAmount))}
+                </span>
                 {fee.voidReason ? ` · Motivo de anulación: ${fee.voidReason}` : ""}
               </p>
               {canManage && fee.status === "ACTIVO" && fee.appliedAmount === 0 ? (

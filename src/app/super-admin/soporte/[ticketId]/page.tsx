@@ -26,12 +26,12 @@ export default async function TicketPage({ params }: { params: Promise<{ ticketI
       <Link href="/super-admin/soporte" className="text-primary text-sm underline">
         ← Soporte
       </Link>
-      <h1 className="mt-2 text-2xl font-semibold md:text-3xl">{ticket.businessName}</h1>
+      <h1 className="mt-2 text-2xl font-semibold break-words md:text-3xl">{ticket.businessName}</h1>
       <div className="mt-2">
         <TicketBadges status={ticket.status} priority={ticket.priority} />
       </div>
       <p className="mt-3 break-words whitespace-pre-line">{ticket.description}</p>
-      <p className="text-muted text-sm">
+      <p className="text-muted text-sm break-words">
         {ticket.createdByName} · {formatDateTimeInZone(ticket.createdAt, DEFAULT_TIME_ZONE)}
       </p>
 

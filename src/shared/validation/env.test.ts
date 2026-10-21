@@ -8,6 +8,7 @@ const validPublic = {
 };
 
 const validServer = {
+  PUBLIC_SITE_URL: "https://cuadre.example",
   SUPABASE_SERVICE_ROLE_KEY: "service-role-key",
   DATABASE_URL: "postgresql://usuario:clave@db.ejemplo.local:6543/postgres",
   AUTH_SYNTHETIC_EMAIL_DOMAIN: "cuadre.invalid",
@@ -60,10 +61,23 @@ describe("parsePublicEnv", () => {
 describe("parseServerEnv", () => {
   it("devuelve las variables tipadas cuando son válidas", () => {
     expect(parseServerEnv(validServer)).toEqual({
+      publicSiteUrl: "https://cuadre.example",
       supabaseServiceRoleKey: "service-role-key",
       databaseUrl: "postgresql://usuario:clave@db.ejemplo.local:6543/postgres",
       syntheticEmailDomain: "cuadre.invalid",
     });
+  });
+
+  it("normaliza el origen y rechaza URL que no sean orígenes HTTP absolutos", () => {
+    expect(
+      parseServerEnv({ ...validServer, PUBLIC_SITE_URL: "https://cuadre.example/" }).publicSiteUrl,
+    ).toBe("https://cuadre.example");
+
+    for (const bad of ["", "/", "ftp://cuadre.example", "https://cuadre.example/ruta"]) {
+      const error = catchError(() => parseServerEnv({ ...validServer, PUBLIC_SITE_URL: bad }));
+      expect(error.message).toContain("PUBLIC_SITE_URL");
+      if (bad) expect(error.message).not.toContain(bad);
+    }
   });
 
   it("acepta los esquemas postgres:// y postgresql://", () => {
