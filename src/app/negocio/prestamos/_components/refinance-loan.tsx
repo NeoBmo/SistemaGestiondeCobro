@@ -145,6 +145,13 @@ export function RefinanceLoan({
     const result = await confirm.run(body, {
       headers: { "Idempotency-Key": idempotency.current() },
     });
+    // Entre la vista previa y la confirmación pudo registrarse otra usura: se recalcula para mostrar la
+    // advertencia (y su casilla) con lo que el servidor exige ahora. El error explica el motivo.
+    if (result.status === "error" && result.error.code === "USURY_WARNING_NOT_ACKNOWLEDGED") {
+      setUsuryAcknowledged(false);
+      await preview.run(terms);
+      return;
+    }
     if (result.status === "success") {
       feedback.announce(
         `Préstamo ${contractNumber} refinanciado en el contrato ${result.data.newContractNumber}. Caja Mayor: ${formatMoney(money(result.data.balance))}.`,

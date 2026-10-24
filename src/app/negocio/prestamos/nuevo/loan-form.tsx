@@ -119,6 +119,13 @@ export function LoanForm({ clientId, clientName, suggestedFirstDueOn }: Props) {
     const result = await confirm.run(body, {
       headers: { "Idempotency-Key": idempotency.current() },
     });
+    // Entre la vista previa y la confirmación pudo registrarse otra usura: se recalcula para mostrar la
+    // advertencia (y su casilla) con lo que el servidor exige ahora. El error explica el motivo.
+    if (result.status === "error" && result.error.code === "USURY_WARNING_NOT_ACKNOWLEDGED") {
+      setUsuryAcknowledged(false);
+      await preview.run(terms);
+      return;
+    }
     if (result.status === "success") {
       router.push(`/negocio/prestamos/${result.data.loanId}`);
     }
