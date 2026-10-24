@@ -124,12 +124,17 @@ describe("signInWithUsername", () => {
       },
     } as unknown as LoginDeps["supabase"];
 
-    // Únicos por ejecución (salvo el vacío): el límite de intentos cuenta también estos fallos.
-    const suffix = crypto.randomUUID().slice(0, 4);
-    for (const username of [`no válido ${suffix}`, "", suffix.slice(0, 2)]) {
+    // El límite de intentos (02 §1.4) también cuenta estos fallos y el usuario vacío no puede ser único:
+    // un reloj desplazado al azar (en horas) pone cada ejecución en una ventana de 15 minutos distinta.
+    const offsetHours = 1 + Math.floor(Math.random() * 1_000_000);
+    const now = () => new Date(Date.now() + offsetHours * 3_600_000);
+    for (const username of ["no válido", "", "ab"]) {
       expect(
-        (await failureOf(signInWithUsername(deps(supabase), { username, password: "Clave12345" })))
-          .code,
+        (
+          await failureOf(
+            signInWithUsername({ ...deps(supabase), now }, { username, password: "Clave12345" }),
+          )
+        ).code,
       ).toBe("INVALID_CREDENTIALS");
     }
     expect(supabase.auth.signInWithPassword).not.toHaveBeenCalled();

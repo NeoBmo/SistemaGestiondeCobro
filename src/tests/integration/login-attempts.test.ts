@@ -235,7 +235,7 @@ describe("límite por usuario: 5 fallos seguidos en 15 minutos bloquean 15 minut
 });
 
 describe("límite por IP: más de 30 fallos en 15 minutos la bloquean 15 minutos", () => {
-  it("30 fallos no bloquean; el 31.º sí, para cualquier usuario desde esa IP", async () => {
+  it("31 fallos completan el umbral («más de 30»); el siguiente intento desde esa IP se bloquea, sea cual sea el usuario", async () => {
     const time = clock();
     const { supabase, signInWithPassword } = fakeAuth(() => wrongPassword);
     const deps: LoginDeps = {
@@ -363,6 +363,13 @@ describe("eventos de seguridad", () => {
           `update public.login_security_events set result = 'EXITOSO' where id = '${id}'`,
         ),
       ).toBeNull();
+      // Ya cerrado: no se puede volver a cerrar con otro resultado.
+      expect(
+        await attempt(
+          client,
+          `update public.login_security_events set result = 'CREDENCIALES_INVALIDAS' where id = '${id}'`,
+        ),
+      ).toMatchObject({ code: RESTRICT_VIOLATION });
     });
   });
 
