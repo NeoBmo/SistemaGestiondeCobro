@@ -2,6 +2,11 @@ import { allocatePayment, type ExplainableInstallment } from "./payment-allocati
 
 export type { ExplainableInstallment } from "./payment-allocation";
 
+/**
+ * Explica cómo se aplicaría un pago de cuotas (02 §3.2) con el mismo reparto que usa el servidor
+ * (`allocatePayment`). Es solo una ayuda de lectura para el formulario: la aplicación real la decide
+ * el servidor dentro de la transacción.
+ */
 export type PaymentExplanation =
   | {
       ok: true;

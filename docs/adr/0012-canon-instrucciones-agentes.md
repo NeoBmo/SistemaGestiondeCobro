@@ -1,6 +1,6 @@
 # ADR 0012 — Canon de instrucciones para agentes de código
 
-- Estado: Aceptado
+- Estado: Reemplazado por ADR 0014 (2026-10-24)
 - Fecha: 2026-10-19
 - Contexto: el equipo usa Codex, Claude Code y OpenCode. Sus nombres de archivo y precedencia difieren; las reglas comunes no deben depender de que un modelo abra otro documento por iniciativa propia.
 

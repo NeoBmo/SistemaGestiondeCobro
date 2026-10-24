@@ -8,7 +8,7 @@
 | `.claude/agents/code-reviewer.md` | Revisión independiente posterior de diff UI: reglas frontend, montos, estados, pruebas y dependencias. Recibe explícitamente las rutas cambiadas; no implementa ni escoge identidad. |
 | `.claude/agents/verificador-de-fase.md` | Verifica los criterios de salida de fase descritos en `docs/planning/04-PLAN.md`; se invoca al cerrar fase, no para cada componente. |
 | `docs/planning/06-AGENTES-HABILIDADES.md` | Define el papel y límite de subagentes/skills y la convivencia con `CLAUDE.md`. No contiene skills de creación de UI. |
-| `AGENTS.md` / `CLAUDE.md` | Seguridad, fases, calidad y límites del repositorio; prevalecen ante cualquier contradicción de una skill. |
+| `CLAUDE.md` | Seguridad, fases, calidad y límites del repositorio; prevalecen ante cualquier contradicción de una skill. |
 
 ## Skills nuevas propuestas
 
@@ -52,4 +52,4 @@ Las siguientes son propuestas de instrucciones reutilizables, no skills ya insta
 
 ## Límites comunes
 
-Una skill guía trabajo repetitivo; no es fuente de verdad, no reabre decisiones cerradas y no reemplaza la aprobación de una spec. Si una propuesta contradice `CLAUDE.md`, `AGENTS.md`, `docs/planning/02-DOMINIO.md`, `03-ARQUITECTURA.md` o la regla frontend, prevalecen esos documentos según su orden de autoridad. No se instalará `@axe-core/playwright` ni otra dependencia como efecto de estas propuestas.
+Una skill guía trabajo repetitivo; no es fuente de verdad, no reabre decisiones cerradas y no reemplaza la aprobación de una spec. Si una propuesta contradice `CLAUDE.md`, `docs/planning/02-DOMINIO.md`, `03-ARQUITECTURA.md` o la regla frontend, prevalecen esos documentos según su orden de autoridad. No se instalará `@axe-core/playwright` ni otra dependencia como efecto de estas propuestas.

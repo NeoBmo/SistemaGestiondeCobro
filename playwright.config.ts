@@ -47,7 +47,7 @@ export default defineConfig({
     { name: "mobile", use: { ...devices["Pixel 7"] } },
   ],
   webServer: {
-    command: `npm run build -- --webpack && npm run start -- --hostname 127.0.0.1 --port ${PORT}`,
+    command: `npm run build && npm run start -- --hostname 127.0.0.1 --port ${PORT}`,
     url: `${baseURL}/api/health`,
     env: e2eEnv,
     reuseExistingServer: !process.env.CI,

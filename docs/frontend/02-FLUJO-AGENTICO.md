@@ -2,11 +2,11 @@
 
 ## Autoridad y roles de UI
 
-- `AGENTS.md` es la entrada compartida para las herramientas agénticas; `CLAUDE.md` importa esa guía por compatibilidad con Claude Code. `.claude/rules/frontend-design.md` fija los requisitos de UI: responsividad mobile-first, WCAG 2.1 AA, movimiento reducido, jerarquía tipográfica, cuatro estados visuales y color no exclusivo.
-- `AGENTS.md` describe el flujo general y la protección del repositorio. Este documento agrega solamente el criterio frontend; no reemplaza ni duplica sus pasos, comandos, reglas de Git o política de seguridad.
+- `CLAUDE.md` es la guía operativa de Claude Code, la única herramienta agéntica del proyecto (ADR 0014). `.claude/rules/frontend-design.md` fija los requisitos de UI: responsividad mobile-first, WCAG 2.1 AA, movimiento reducido, jerarquía tipográfica, cuatro estados visuales y color no exclusivo.
+- `CLAUDE.md` describe el flujo general y la protección del repositorio. Este documento agrega solamente el criterio frontend; no reemplaza ni duplica sus pasos, comandos, reglas de Git o política de seguridad.
 - `code-reviewer` evalúa el diff de UI frente a reglas de diseño y arquitectura, con atención a estados, accesibilidad, contraste, montos y ausencia de dependencias no aprobadas. Su dictamen no define la identidad visual.
 - `verificador-de-fase` comprueba criterios de cierre de fase completa; no sustituye la revisión focalizada de una pantalla o componente.
-- `docs/frontend/00-DIAGNOSTICO.md` es evidencia de auditoría, `01-PLAN-FRONTEND.md` contiene dirección de trabajo y la spec aprobada define los requisitos de cada tarea. Ante contradicción, gana la fuente superior definida en `AGENTS.md`/`CLAUDE.md`.
+- `docs/frontend/00-DIAGNOSTICO.md` es evidencia de auditoría, `01-PLAN-FRONTEND.md` contiene dirección de trabajo y la spec aprobada define los requisitos de cada tarea. Ante contradicción, gana la fuente superior definida en `CLAUDE.md`.
 
 ## Definición frontend de terminado
 
@@ -20,6 +20,6 @@ Una pantalla o componente se considera terminado cuando, según su alcance aprob
 6. pasa las verificaciones automatizadas y manuales enumeradas en su spec, y registra cualquier limitación no cubierta;
 7. mantiene lectura en servidor por defecto; añade interacción de cliente solo si la interacción requiere estado o eventos en el navegador.
 
-## Fuente de verdad entre Codex y Claude Code
+## Fuente de verdad
 
-`AGENTS.md` permanece como guía operativa compartida y enlaza las fuentes normativas de `docs/planning/` y `docs/adr/`. Los documentos de `docs/frontend/` amplían el trabajo frontend sin copiar reglas de dominio o arquitectura. Las skills y agentes pueden operacionalizar un requisito, nunca reemplazarlo ni introducir decisiones visuales o de producto. Si una regla se repite y cambia, actualizar su fuente normativa y enlazarla desde el otro entorno en vez de mantener dos copias divergentes.
+`CLAUDE.md` es la guía operativa y enlaza las fuentes normativas de `docs/planning/` y `docs/adr/`. Los documentos de `docs/frontend/` amplían el trabajo frontend sin copiar reglas de dominio o arquitectura. Las skills y agentes pueden operacionalizar un requisito, nunca reemplazarlo ni introducir decisiones visuales o de producto. Si una regla se repite y cambia, actualizar su fuente normativa y enlazarla en vez de mantener dos copias divergentes.
