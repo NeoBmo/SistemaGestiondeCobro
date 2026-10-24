@@ -22,6 +22,21 @@ describe("validación de clientes", () => {
     }
   });
 
+  it("la identificación necesita al menos una letra o un dígito (la unicidad compara solo esos)", () => {
+    for (const identification of ["ABC-1", "ñ", "7", "Ñandú 1"]) {
+      expect(
+        createClientSchema.safeParse({ name: "Ana", identification }).success,
+        identification,
+      ).toBe(true);
+    }
+    for (const identification of ["-", "--/..", "#"]) {
+      expect(
+        createClientSchema.safeParse({ name: "Ana", identification }).success,
+        identification,
+      ).toBe(false);
+    }
+  });
+
   it("respeta los largos máximos y rechaza el byte nulo", () => {
     const base = { name: "Ana", identification: "1" };
     expect(createClientSchema.safeParse({ ...base, name: "x".repeat(121) }).success).toBe(false);

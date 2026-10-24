@@ -116,7 +116,8 @@ describe("alta de clientes", () => {
 });
 
 describe("edición de clientes", () => {
-  it("cambia el contacto y audita qué campos cambiaron, con su valor anterior y el nuevo", async () => {
+  // 02 §2.1 (decisión del 2026-10-24, auditoría mínima): el evento nombra los campos, no sus valores.
+  it("cambia el contacto y audita qué campos cambiaron, sin sus valores anteriores ni nuevos", async () => {
     const { businessId, admin } = await newBusiness();
     const client = await createClient(deps, admin, {
       name: "Ana",
@@ -143,16 +144,14 @@ describe("edición de clientes", () => {
       {
         entity_id: client.id,
         result: "OK",
-        summary: {
-          changes: {
-            name: { from: "Ana", to: "Ana María" },
-            phone: { from: "300", to: "310" },
-            whatsapp: { from: null, to: "310" },
-            notes: { from: "Vive en la esquina", to: null },
-          },
-        },
+        summary: { changed: ["name", "phone", "whatsapp", "notes"] },
       },
     ]);
+    // Ningún dato personal, ni el anterior ni el nuevo, queda en el evento.
+    const serialized = JSON.stringify(await audit(businessId, "ClienteActualizado"));
+    for (const value of ["Ana María", "300", "310", "Vive en la esquina"]) {
+      expect(serialized, value).not.toContain(value);
+    }
   });
 
   it("sin cambios no escribe ni audita", async () => {

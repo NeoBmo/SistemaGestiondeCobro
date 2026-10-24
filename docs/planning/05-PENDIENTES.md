@@ -8,6 +8,8 @@ La mayoría de las decisiones de V1 ya están cerradas y viven en `02-DOMINIO.md
 
 - **Revisión jurídica de los borradores legales** (bloquea F8, antes de cualquier dato real). Borradores v0.1 del 2026-10-24 en `docs/legal/`: términos y condiciones, política de tratamiento de datos personales y una nota con 9 preguntas para el abogado (roles responsable/encargado, transmisión internacional, Ley 2300 y recaudo presencial, suficiencia de la advertencia de usura, Ley 1266, conservación vs. supresión, RNBD, legalidad de la actividad de los clientes e identidad del proveedor). Falta también completar los datos del proveedor (razón social, NIT, contacto) y las regiones de Supabase y Vercel.
 
+- **Supresión de clientes (02 §2.1), dos puntos no escritos en 02.** (a) `ClienteCreado` guarda nombre e identificación en `audit_events`, que es de solo agregado: tras eliminar al cliente esos datos permanecen. ¿Pasa a guardar `{}` desde ahora, y qué se hace con los eventos ya existentes (y con los `ClienteActualizado` antiguos con valores `from/to`)? Ligado a la pregunta 6 al abogado. (b) Un cliente sin contratos pero con asignaciones de ruta (incluso `CERRADA`) o intentos de cobro hoy **no** se elimina (409, bloqueo provisional; sus claves foráneas lo impiden). ¿Se mantiene, o se borran/anonimizan también esas filas? Rama `claude/cartera-clientes-27f040`.
+
 ## Abiertos por fase (no bloquean fases anteriores; resolver **antes** de iniciar la fase indicada)
 
 | Tema | Bloquea |
