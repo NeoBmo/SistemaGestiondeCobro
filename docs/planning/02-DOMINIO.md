@@ -44,6 +44,8 @@ Valores V1: `SEMANAL`, `MENSUAL`, `ANUAL`.
 - Mensual: 1 mes, sin límite práctico de cobradores, dashboard configurable.
 - Anual: 1 año, mismas capacidades que mensual, 20 % de ahorro frente a 12 mensualidades.
 
+Precios V1 en COP (decisión del 2026-10-24; el precio es configurable en `plans`): semanal **25.000** (plan de prueba), mensual **100.000** (precio normal), anual **960.000** (12 × 100.000 = 1.200.000 con 20 % de descuento: es el plan objetivo y se presenta como la opción recomendada). La landing pública muestra los tres precios y, en el anual, el precio de referencia y el ahorro.
+
 ### 1.2 Negocio
 
 Datos: id único, nombre, responsable (nombre e identificación), teléfono, zona horaria (IANA, por defecto `America/Bogota`, fijada al crear el negocio), fecha de creación, estado de acceso (`ACTIVO` | `SUSPENDIDO`).
@@ -57,6 +59,7 @@ Estados **almacenados**: `ACTIVA` | `SUSPENDIDA` (manual, reversible) | `ARCHIVA
 Vencimiento: `SEMANAL` = inicio + 7 días; `MENSUAL` = mismo día del mes siguiente; `ANUAL` = mismo día del año siguiente; si ese día no existe se usa el último del mes (31 ene → 28/29 feb).
 Sincronía con el Negocio (una sola transacción por comando): suspender → suscripción `SUSPENDIDA` y negocio `SUSPENDIDO`; activar → `ACTIVA` y `ACTIVO`; archivar (solo desde `ACTIVA` o `SUSPENDIDA`, con motivo) → `ARCHIVADA` y negocio `SUSPENDIDO`. Cambiar de plan reinicia inicio y vencimiento desde hoy.
 Re-suscripción: un negocio archivado puede volver. El Super Admin crea una **suscripción nueva** `ACTIVA` desde hoy, con el plan que elija, y el negocio vuelve a `ACTIVO`; sus cuentas siguen vivas (el Super Admin restablece la del admin si cambió de titular). La fila `ARCHIVADA` **no se reactiva ni se modifica**: queda como historial. Cada negocio tiene como máximo **una suscripción vigente** (las `ARCHIVADA` no cuentan) y la re-suscripción no exige motivo, pero el evento registra el plan y las fechas de la suscripción anterior (ADR 0005).
+Cambio de plan y renovación (decisión del 2026-10-24): el plan se cambia con la suscripción `ACTIVA` o `SUSPENDIDA` (nunca `ARCHIVADA`) y no cambia su estado; elegir el mismo plan reinicia el periodo y es la forma de renovar (no hay flujo de renovación aparte); la observación es opcional salvo el motivo de archivado, y la nueva sustituye a la anterior en la suscripción (el historial queda en la auditoría); activar no comprueba el vencimiento, porque `VENCIDA` es informativa.
 Reglas: `PROXIMA_A_VENCER`/`VENCIDA` son informativos, no bloquean automáticamente. Solo Super Admin cambia entre `ACTIVA`/`SUSPENDIDA`. `ARCHIVADA` es un estado terminal distinto de `SUSPENDIDA`: se usa cuando un negocio se da de baja, mientras que `SUSPENDIDA` sigue siendo reversible. Si un negocio archivado vuelve, es por re-suscripción (una suscripción nueva), nunca por reactivar la fila archivada. Solo Super Admin archiva y re-suscribe. Todo cambio se audita.
 Eventos: `SuscripcionCreada`, `PlanCambiado`, `NegocioSuspendido`, `NegocioActivado`, `NegocioArchivado`. (`SuscripcionVencida` deja de ser un evento persistido: es un estado derivado.)
 
@@ -68,7 +71,13 @@ Recuperación de contraseña: el admin del negocio restablece la de sus cobrador
 Roles: `SUPER_ADMIN` (sin negocio), `ADMIN_NEGOCIO` (una sola cuenta principal por negocio en V1), `COBRADOR` (pertenece a un negocio, vinculado a un cobrador).
 Estados: `ACTIVO`, `BLOQUEADO`, `PENDIENTE_CAMBIO_CONTRASENA`.
 Reglas: la identificación personal nunca es contraseña; contraseña inicial temporal obliga cambio en primer acceso; política de contraseña: 8 o más caracteres con al menos una letra y un dígito (ADR 0004); un cobrador no actúa sobre otro negocio ni otra cartera.
-Eventos: `UsuarioCreado`, `PrimerAccesoCompletado`, `InicioSesion`, `UsuarioBloqueado`, `ContrasenaCambiada`, `ContrasenaRestablecida`.
+Decisiones del 2026-10-24:
+- **Inmutables en V1:** el rol, el negocio y el nombre de usuario de un perfil no cambian (cambiar un rol exigiría refrescar el JWT); si hace falta otro rol, se crea otro usuario.
+- **Límite de intentos en la aplicación** (Supabase Auth ve la IP del servidor, así que su límite es global): 5 fallos seguidos de un mismo usuario en 15 minutos lo bloquean 15 minutos; más de 30 fallos desde una misma IP en 15 minutos la bloquean 15 minutos. Sin CAPTCHA en V1.
+- **Inicios de sesión fallidos:** se registran como eventos de seguridad (usuario intentado, IP, fecha y motivo; nunca la contraseña), separados de la auditoría de negocio; son la base del límite de intentos.
+- **Alta de Super Admin:** la única vía es el script de administración; exige un motivo y registra un evento de auditoría con el usuario del sistema operativo que lo ejecutó, el motivo y la fecha.
+- **Sin 2FA en V1** (lista de mejoras posteriores, `09-MEJORAS-POST-V1.md`).
+Eventos: `UsuarioCreado`, `PrimerAccesoCompletado`, `InicioSesion`, `InicioSesionFallido` (evento de seguridad), `UsuarioBloqueado`, `ContrasenaCambiada`, `ContrasenaRestablecida`, `SuperAdminCreado`.
 
 ---
 
@@ -79,7 +88,13 @@ Eventos: `UsuarioCreado`, `PrimerAccesoCompletado`, `InicioSesion`, `UsuarioBloq
 Sin acceso de usuario en V1.
 Datos: negocio, nombre, sobrenombre opcional, identificación, dirección, teléfono, WhatsApp, notas, fechas.
 Reglas: la identificación es **única por negocio** (ADR 0007); datos de contacto editables y auditados; un cliente con historial financiero no se elimina; el cliente **no** almacena un único estado de contrato/saldo/prioridad editable — se calcula desde sus préstamos y cuotas.
-Eventos: `ClienteCreado`, `ClienteActualizado`.
+Decisiones del 2026-10-24 (protección de datos personales, Ley 1581 de 2012):
+- **Unicidad normalizada:** la identificación se guarda tal como se escribió, pero la unicidad compara su forma normalizada (Unicode NFC, sin mayúsculas, solo letras y dígitos): `ABC-1`, `abc 1` y `abc1` son el mismo documento.
+- **Búsqueda** por nombre, sobrenombre o identificación sin distinguir tildes ni mayúsculas (`andres` encuentra `Andrés`).
+- **Supresión:** un cliente sin ningún contrato ni préstamo puede eliminarse (error de captura o derecho de supresión), con evento de auditoría sin datos personales.
+- **Auditoría mínima:** `ClienteActualizado` registra qué campos cambiaron, no sus valores anteriores ni nuevos; los datos vigentes viven solo en el cliente.
+- **Edición concurrente:** gana la última edición (V1 tiene un único Admin por negocio).
+Eventos: `ClienteCreado`, `ClienteActualizado`, `ClienteEliminado`.
 
 ### 2.2 Contrato
 
@@ -94,7 +109,8 @@ Eventos: `ContratoCreado`, `ContratoConfirmado`, `ContratoAnulado`.
 Obligación financiera resultante de un contrato confirmado.
 Datos: contrato, monto principal, interés % (guardado en puntos básicos enteros: 20 % = 2000) y monetario, total a pagar, fecha de desembolso, primera fecha de cobro, frecuencia (`DIARIA`|`SEMANAL`|`MENSUAL`), cantidad de cuotas, saldo pendiente derivado, préstamo anterior opcional (si viene de refinanciación), estado.
 Estados: `ACTIVO` (saldo pendiente) → `PAGADO` (sin saldo en cuotas ni cargos de mora activos) | `REFINANCIADO` (saldo cancelado por préstamo nuevo) | `ANULADO` (anulación válida del contrato).
-Reglas: un contrato confirmado genera un préstamo y su calendario de cuotas; el desembolso de un préstamo nuevo reduce Caja Mayor (no puede confirmarse sin saldo suficiente); un préstamo importado no genera desembolso histórico; un cliente puede tener varios préstamos activos; el total original no se modifica tras confirmar.
+Reglas: un contrato confirmado genera un préstamo y su calendario de cuotas; el desembolso de un préstamo nuevo reduce Caja Mayor (no puede confirmarse sin saldo suficiente); un préstamo importado no genera desembolso histórico; un cliente puede tener varios préstamos activos; el total original no se modifica tras confirmar; la primera fecha de cobro no puede ser anterior al día del desembolso en la zona del negocio (no hay «cuota inicial» en V1); los topes técnicos de interés y número de cuotas (ADR 0007) se exigen también en la base de datos (decisiones del 2026-10-24).
+**Tasa de usura** (decisión del 2026-10-24, a validar con abogado): cobrar por encima de la tasa de usura vigente es delito en Colombia (art. 305 del Código Penal). El Super Admin registra la tasa de usura vigente que certifica la Superintendencia Financiera; al crear o refinanciar un préstamo, si su tasa efectiva anual equivalente (según interés total, plazo y frecuencia) la supera, el sistema **advierte** de forma visible antes de confirmar y, si el Admin confirma, la advertencia queda en la auditoría del contrato. No se bloquea: la responsabilidad legal del préstamo es del negocio y así lo declaran los términos y condiciones.
 Eventos: `PrestamoCreado`, `PrestamoDesembolsado`, `PrestamoPagado`, `PrestamoRefinanciado`, `PrestamoAnulado`.
 
 ### 2.4 Cuota
@@ -149,6 +165,8 @@ Pago $150.000 → completa cuota 1 y cubre cuota 2
 
 No se permite registrar un pago superior al saldo total pendiente. V1 no maneja saldos a favor ni devoluciones.
 
+El orden de aplicación es el número de cuota (que coincide con el orden cronológico). Las cuotas futuras se pueden pagar por anticipado, sin descuento del interés pactado (decisión del 2026-10-24).
+
 ### 3.3 Mora de cuota (cálculo, no entidad)
 
 ```text
@@ -171,7 +189,8 @@ días de mora = máximo(0, fecha de referencia − fecha de vencimiento)
 
 Penalización monetaria **decidida manualmente** por el administrador — nunca automática.
 Datos: negocio, préstamo, cuota opcional, monto original, monto pagado, saldo pendiente, fecha, motivo, admin creador, estado (`ACTIVO`|`PAGADO`|`ANULADO`).
-Reglas: no se crea por fórmula automática; se paga solo con un pago registrado explícitamente contra el cargo; anularlo exige motivo y auditoría y solo es posible si no tiene pagos aplicados vigentes (hay que reversarlos antes); un préstamo no pasa a `PAGADO` con cargos `ACTIVO` con saldo pendiente.
+Reglas: no se crea por fórmula automática; se paga solo con un pago registrado explícitamente contra el cargo; anularlo exige motivo y auditoría y solo es posible si no tiene pagos aplicados vigentes (hay que reversarlos antes); un préstamo no pasa a `PAGADO` con cargos `ACTIVO` con saldo pendiente; un pago de cargo nunca lo deja por debajo de cero ni genera saldo a favor.
+La mora es por atraso (decisión del 2026-10-24): si el cargo indica una cuota, esa cuota debe tener su vencimiento ya pasado; si es sobre el préstamo, este debe tener al menos una cuota con vencimiento pasado. Un cargo sobre un préstamo `PAGADO` lo devuelve a `ACTIVO` (mora descubierta después del último pago); si al pagar o anular ese cargo el préstamo vuelve a quedar sin saldo, pasa a `PAGADO` y se audita `PrestamoPagado`, igual que en el primer cierre.
 Eventos: `CargoMoraCreado`, `CargoMoraPagado`, `CargoMoraAnulado`.
 
 ### 3.5 Refinanciación
@@ -219,6 +238,8 @@ Tipos: `INTENTO_FALLIDO`, `VOLVER_A_COBRAR`.
 Motivos de intento fallido: `CLIENTE_AUSENTE`, `LUGAR_CERRADO`, `SIN_DINERO`, `DIRECCION_INCORRECTA`, `OTRO` (exige observación).
 El evento no altera la deuda ni crea una cuota nueva.
 
+**Ley 2300 de 2023 (cobranza)** (decisión del 2026-10-24, a validar con abogado): cumplir los canales autorizados por el deudor, los horarios legales (lunes a viernes de 7:00 a 19:00, sábados de 8:00 a 15:00, sin domingos ni festivos), la periodicidad y la restricción de visitas al domicilio o lugar de trabajo (art. 6) es **responsabilidad del negocio** y así lo declaran los términos y condiciones (`docs/legal/`). En V1 la plataforma no registra autorizaciones ni restringe horarios (ver `09-MEJORAS-POST-V1.md`).
+
 ---
 
 ## 5. Cajas, gastos y liquidaciones
@@ -227,7 +248,7 @@ El evento no altera la deuda ni crea una cuota nueva.
 
 Una por negocio. **No se guarda un saldo manual como fuente de verdad** — se deriva de sus movimientos.
 
-Reglas (ADR 0006): el saldo de Caja Mayor **nunca queda negativo** — todo movimiento que lo dejaría por debajo de cero (gasto directo, desembolso, fondo, ajuste negativo o reverso de una entrada) se rechaza; un negocio registra **un solo** `SALDO_APERTURA` (los ingresos posteriores de capital son `INGRESO_CAPITAL`; un error en la apertura se corrige con `AJUSTE`/`REVERSO`).
+Reglas (ADR 0006): el saldo de Caja Mayor **nunca queda negativo** — todo movimiento que lo dejaría por debajo de cero (gasto directo, desembolso, fondo, ajuste negativo o reverso de una entrada) se rechaza; un negocio registra **un solo** `SALDO_APERTURA` (los ingresos posteriores de capital son `INGRESO_CAPITAL`; un error en la apertura se corrige con un `AJUSTE` ± con motivo). Reversar el `SALDO_APERTURA` no libera el cupo: no se registra una segunda apertura (decisión del 2026-10-24).
 
 ### 5.2 Jornada de Caja Menor
 
@@ -246,14 +267,14 @@ Reglas: todo movimiento tiene causa de negocio identificable; no se edita ni eli
 
 Datos: negocio, tipo de caja, jornada opcional, monto, categoría, fecha, observación, usuario creador, movimiento asociado.
 Categorías: `GASOLINA`, `ALIMENTACION`, `REPARACION`, `MEDICINA`, `OTRO` (exige observación).
-Corregir/rechazar un gasto genera un `AJUSTE`; nunca cambia ni borra el gasto original.
+Nunca se cambia ni borra el gasto original (decisión del 2026-10-24): un gasto registrado por error se anula por completo con un `REVERSO` de su movimiento, enlazado al original; una corrección parcial del importe es un `AJUSTE` con motivo. Todo reporte de gastos excluye los gastos cuyo movimiento está reversado.
 
 ### 5.5 Liquidación
 
 Cierre de una jornada de Caja Menor frente a Caja Mayor.
 Datos: jornada, saldo esperado, dinero entregado, diferencia, cobrador declarante, admin que confirma, fechas, estado.
 Estados: `PENDIENTE_REVISION`, `CUADRADA`, `CON_DIFERENCIA`, `REVISADA`.
-Reglas (ADR 0009): el cobrador declara (jornada `PENDIENTE_LIQUIDACION`, liquidación `PENDIENTE_REVISION`) y el Admin confirma (liquidación `CUADRADA` o `CON_DIFERENCIA`, jornada `LIQUIDADA` o `LIQUIDADA_CON_DIFERENCIA`); `REVISADA` = el Admin resolvió la diferencia con un `AJUSTE`. Declarar no mueve dinero; al confirmar se transfiere a Caja Mayor el dinero **realmente entregado**; la diferencia se registra como `FALTANTE`/`SOBRANTE`, exige observación y genera un movimiento `DIFERENCIA_CAJA` para cerrar la jornada en cero; resolver una diferencia genera un nuevo `AJUSTE`, nunca cambia la liquidación previa. Corregir un pago de una jornada ya liquidada lo registra el Admin contra la Caja Mayor; la jornada no se reabre.
+Reglas (ADR 0009): el cobrador declara (jornada `PENDIENTE_LIQUIDACION`, liquidación `PENDIENTE_REVISION`) y el Admin confirma (liquidación `CUADRADA` o `CON_DIFERENCIA`, jornada `LIQUIDADA` o `LIQUIDADA_CON_DIFERENCIA`); `REVISADA` = el Admin resolvió la diferencia. Declarar no mueve dinero; al confirmar se transfiere a Caja Mayor el dinero **realmente entregado**; la diferencia se registra como `FALTANTE`/`SOBRANTE`, exige observación y genera un movimiento `DIFERENCIA_CAJA` para cerrar la jornada en cero; resolver una diferencia nunca cambia la liquidación previa y se hace de una de dos formas, una sola vez y con motivo (decisión del 2026-10-24): **reposición** — un `AJUSTE` de la Caja Mayor por el importe exacto (el faltante repuesto entra, el sobrante devuelto sale) — o **asumida por el negocio** — se cierra sin mover dinero (la pérdida o el sobrante ya están reflejados en lo realmente entregado). V1 no resuelve diferencias en parcialidades. Corregir un pago de una jornada ya liquidada lo registra el Admin contra la Caja Mayor (el reverso se rechaza si la dejaría en negativo); la jornada no se reabre. Una jornada `ABIERTA` de un día anterior sigue usable hasta que se declare: no hay cierre automático por fecha (la alerta de caja pendiente la hace visible).
 Eventos: `JornadaAbierta`, `FondoOperativoTransferido`, `SaldoAperturaRegistrado`, `CapitalIngresado`, `GastoRegistrado`, `LiquidacionDeclarada`, `LiquidacionConfirmada`, `DiferenciaRegistrada`, `AjusteRegistrado`, `ReversoRegistrado`.
 
 Fórmulas:
@@ -272,6 +293,10 @@ diferencia      = saldo esperado − dinero entregado
 No es una entidad adicional: es un contrato/préstamo con `origen = IMPORTADO`.
 Datos requeridos: cliente, fecha original, principal original, interés o total pactado, frecuencia, cuotas si se conocen, monto ya pagado histórico (solo referencia), saldo inicial pendiente, próxima fecha de cobro, cuotas futuras.
 Reglas: no crea pagos, desembolsos ni movimientos históricos en cajas; los pagos posteriores a la importación siguen las reglas normales; la mora anterior solo se representa si se conocen fechas de vencimiento pasadas.
+Decisiones del 2026-10-24:
+- **Solo lo pendiente:** el préstamo importado contiene únicamente las cuotas que faltan, numeradas 1..n desde la próxima fecha de cobro; el total pactado y el monto ya pagado histórico se guardan como referencia, sin crear cuotas pagadas ni pagos que no ocurrieron en el sistema.
+- **Montos por cuota:** la pantalla propone el saldo pendiente repartido en partes iguales (como un préstamo nuevo, ADR 0007) y el Admin puede escribir el monto de cada cuota restante; cada monto es mayor que cero y la suma debe ser exactamente el saldo pendiente.
+- **Descuadre histórico:** si total pactado − pagado histórico − saldo pendiente ≠ 0, la importación exige confirmación explícita y una observación; la diferencia y la observación quedan en la auditoría de la importación.
 
 ### 6.2 Ticket de soporte
 
@@ -284,7 +309,7 @@ Reglas (ADR 0011): lo crea el Admin del negocio y solo su negocio lo ve; el Supe
 
 Registra la **acción**, no el hecho financiero mismo.
 Datos: negocio opcional, actor, tipo de acción, entidad afectada, id de entidad, fecha/hora, resultado, resumen seguro del cambio.
-Resultado: `OK` (el comando se aplicó) o `RECHAZADO` (el actor estaba autenticado pero no tenía permiso sobre esa entidad). No se auditan los rechazos por datos inválidos ni los intentos de inicio de sesión fallidos (ADR 0005).
+Resultado: `OK` (el comando se aplicó) o `RECHAZADO` (el actor estaba autenticado pero no tenía permiso sobre esa entidad). No se auditan los rechazos por datos inválidos (ADR 0005). Los inicios de sesión fallidos no son auditoría de negocio: van al registro de eventos de seguridad (§1.4, decisión del 2026-10-24).
 Se crea para: contratos, préstamos, pagos, cargos de mora, rutas, asignaciones, cajas, gastos, liquidaciones, suscripciones, usuarios, tickets.
 
 ---
@@ -303,7 +328,7 @@ Se crea para: contratos, préstamos, pagos, cargos de mora, rutas, asignaciones,
 | Diferencia de liquidación | Saldo esperado − dinero entregado |
 | Meta diaria de cobrador | Cuotas vencidas o con vencimiento hoy de su cartera asignada |
 | Proyección de cobros futuros | Suma del valor esperado de cuotas pendientes, agrupada por fecha de vencimiento futura (nunca incluye cuotas ya pagadas ni cargos de mora sin confirmar) |
-| Dashboard | Agregados de contratos, préstamos, cuotas, pagos, cajas, gastos, liquidaciones. Predeterminado: saldo de Caja Mayor, cartera pendiente y vencida, clientes en mora, cobrado y gastos del periodo, jornadas pendientes y diferencias sin resolver, proyección de 7 días; alertas derivadas de vencido, caja pendiente, diferencia y suscripción (ADR 0010). En los planes mensual y anual el Admin elige widgets, orden y periodo (solo presentación) |
+| Dashboard | Agregados de contratos, préstamos, cuotas, pagos, cajas, gastos, liquidaciones. Predeterminado: saldo de Caja Mayor, cartera pendiente y vencida, clientes en mora, cobrado y gastos del periodo, jornadas pendientes y diferencias sin resolver, proyección de 7 días; alertas derivadas de vencido, caja pendiente, diferencia y suscripción (ADR 0010). En los planes mensual y anual el Admin elige widgets, orden y periodo (solo presentación; se permite con la suscripción vencida, que es informativa). Decisión del 2026-10-24: cartera pendiente y vencida cuentan **solo cuotas** y se rotulan así; la mora pendiente (cargos de mora activos) es un indicador aparte, para que cada cifra coincida con su detalle; «Cobrado» incluye los cobros de cargos de mora. Un cliente sin saldo vencido figura «Al día» aunque su préstamo siga `ACTIVO` |
 
 ---
 

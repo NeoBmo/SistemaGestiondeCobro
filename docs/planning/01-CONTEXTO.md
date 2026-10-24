@@ -64,6 +64,7 @@ Aplicación
 - Almacenamiento de comprobantes de gastos, aprobación multinivel de gastos.
 - Chat en tiempo real, SLA o adjuntos en tickets de soporte.
 - Suspensión o cobro automático de suscripciones.
+- Las mejoras decididas para después de V1 (2FA, PITR, CAPTCHA, mora por cuota y por cliente, parcialidades…) se listan, con su motivo, en `09-MEJORAS-POST-V1.md`.
 
 No se construye ninguna de estas capacidades "como preparación". V1 puede asumir conectividad; el producto debe poder evolucionar hacia ellas sin implementarlas ahora.
 
@@ -76,8 +77,9 @@ No se construye ninguna de estas capacidades "como preparación". V1 puede asumi
 | Cobradores activos | Máximo 5 | Sin límite práctico | Sin límite práctico |
 | Vigencia | 7 días | 1 mes | 1 año |
 | Precio relativo | Base | Estándar | 20 % menos que 12 mensualidades |
+| Precio V1 (COP) | 25.000 (prueba) | 100.000 | 960.000 (recomendado; referencia 1.200.000) |
 
-Precios monetarios exactos: ver `05-PENDIENTES.md`.
+Detalle y fuente: `02-DOMINIO.md` §1.1.
 
 ## Principio rector
 
