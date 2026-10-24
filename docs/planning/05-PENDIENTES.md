@@ -6,16 +6,14 @@ La mayoría de las decisiones de V1 ya están cerradas y viven en `02-DOMINIO.md
 
 ## Abierto
 
-- **Precios monetarios reales de los planes** (semanal/mensual/anual): se usan cifras de ejemplo (placeholder) solo para desarrollo — no bloquean F1, pero **no deben pasar a producción** sin reemplazarse por las cifras reales. El campo de precio queda modelado como configurable desde el inicio, precisamente para no tener que tocar esquema cuando llegue el número real.
-- **Redacción legal de términos y condiciones, política de protección de datos y conservación.** No bloquea F1–F2 (F1 solo registra fecha/hora de aceptación). El dueño confirmó el 2026-10-12 haber cumplido el gate previo a F3 (revisión de 02 con un operador real y política de datos personales); **la política escrita no está en el repositorio** — debe incorporarse a `docs/` cuando exista. Los términos y condiciones, antes de operar con datos reales (F8).
+- **Redacción legal de términos y condiciones, política de tratamiento de datos personales y conservación.** El dueño confirmó el 2026-10-12 haber cumplido el gate previo a F3; **la política escrita no está en el repositorio**. Decisión del 2026-10-24: se redacta un primer borrador conforme a la ley colombiana (Ley 1581 de 2012 y su reglamentación, Ley 1266 de 2008 por tratarse de datos de deudas) que declara usos lícitos y responsabilidades (incluida la tasa de usura, 02 §2.3); **un abogado debe revisarlo** antes de operar con datos reales (bloquea F8).
 
 ## Abiertos por fase (no bloquean fases anteriores; resolver **antes** de iniciar la fase indicada)
 
 | Tema | Bloquea |
 | --- | --- |
 | Verificar que Supabase Auth (alojado) acepta el dominio del email sintético (ADR 0002): puede validar dominios/MX | F1 |
-| Metas no funcionales: volumen esperado por negocio, dispositivos/navegadores objetivo, presupuesto por entorno (requiere cifras del dueño del producto) | F8 |
-| **Supuestos de F1-T4 por confirmar** (el código los aplica; 02 §1.3 no los define): cambiar de plan se permite con la suscripción `ACTIVA` o `SUSPENDIDA` (no `ARCHIVADA`) y no cambia su estado; elegir el mismo plan reinicia el período y sirve de renovación (hoy no existe un flujo de renovación propio); la observación es opcional salvo el motivo de archivado y la nueva sustituye a la anterior en `subscriptions.note` (el historial queda en la auditoría); activar no comprueba el vencimiento (`VENCIDA` es informativa) | Confirmar antes de F8 |
+| Metas no funcionales: **dispositivos/navegadores objetivo** del cobrador y del admin (volumen y presupuesto ya decididos, 03 §7) | F8 |
 | La deduplicación de eventos `RECHAZADO` (uno por actor, acción y entidad por minuto) lee y luego inserta sin bloqueo: dos rechazos simultáneos pueden dejar dos eventos | F8 (junto al límite de frecuencia) |
 | **Medición técnica (F3-T2)**: el trigger del calendario es O(n²) por préstamo: suficiente para 6–24 cuotas, medir en importaciones masivas con el seed de volumen (no requiere decisión) | Antes de F8 |
 | **Anulación de contrato (F3-T5)**: 02 §2.2 solo permite anular si el préstamo no tiene pagos ni liquidaciones posteriores; en F3 no existen, así que `annulContract` solo exige que esté ACTIVO. **F4 y F5 deben añadir esas comprobaciones al comando** (y su prueba) antes de registrar el primer pago. Además, la anulación revierte el desembolso con un `REVERSO` aunque la Caja Mayor haya cambiado desde entonces (no puede dejar saldo negativo: es una entrada) | Resuelto en F4 (comprobación de pagos); el resto es informativo |

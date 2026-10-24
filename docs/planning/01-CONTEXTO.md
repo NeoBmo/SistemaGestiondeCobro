@@ -77,8 +77,9 @@ No se construye ninguna de estas capacidades "como preparación". V1 puede asumi
 | Cobradores activos | Máximo 5 | Sin límite práctico | Sin límite práctico |
 | Vigencia | 7 días | 1 mes | 1 año |
 | Precio relativo | Base | Estándar | 20 % menos que 12 mensualidades |
+| Precio V1 (COP) | 25.000 (prueba) | 100.000 | 960.000 (recomendado; referencia 1.200.000) |
 
-Precios monetarios exactos: ver `05-PENDIENTES.md`.
+Detalle y fuente: `02-DOMINIO.md` §1.1.
 
 ## Principio rector
 
