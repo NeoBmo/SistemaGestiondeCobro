@@ -281,6 +281,10 @@ diferencia      = saldo esperado − dinero entregado
 No es una entidad adicional: es un contrato/préstamo con `origen = IMPORTADO`.
 Datos requeridos: cliente, fecha original, principal original, interés o total pactado, frecuencia, cuotas si se conocen, monto ya pagado histórico (solo referencia), saldo inicial pendiente, próxima fecha de cobro, cuotas futuras.
 Reglas: no crea pagos, desembolsos ni movimientos históricos en cajas; los pagos posteriores a la importación siguen las reglas normales; la mora anterior solo se representa si se conocen fechas de vencimiento pasadas.
+Decisiones del 2026-10-24:
+- **Solo lo pendiente:** el préstamo importado contiene únicamente las cuotas que faltan, numeradas 1..n desde la próxima fecha de cobro; el total pactado y el monto ya pagado histórico se guardan como referencia, sin crear cuotas pagadas ni pagos que no ocurrieron en el sistema.
+- **Montos por cuota:** la pantalla propone el saldo pendiente repartido en partes iguales (como un préstamo nuevo, ADR 0007) y el Admin puede escribir el monto de cada cuota restante; cada monto es mayor que cero y la suma debe ser exactamente el saldo pendiente.
+- **Descuadre histórico:** si total pactado − pagado histórico − saldo pendiente ≠ 0, la importación exige confirmación explícita y una observación; la diferencia y la observación quedan en la auditoría de la importación.
 
 ### 6.2 Ticket de soporte
 
