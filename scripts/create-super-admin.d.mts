@@ -12,5 +12,15 @@ export function createSuperAdmin(
     admin: { auth: { admin: Pick<SupabaseClient["auth"]["admin"], "createUser" | "deleteUser"> } };
     syntheticEmailDomain: string;
   },
-  input: { username: string; displayName: string; password: string },
+  input: {
+    username: string;
+    displayName: string;
+    password: string;
+    /** Motivo obligatorio del alta (02 §1.4). */
+    reason: string;
+    /** Usuario del sistema operativo que ejecuta el script (`os.userInfo().username`). */
+    operator: string;
+  },
 ): Promise<{ userId: string; username: string }>;
+
+export function parseCliArgs(argv: string[]): { reason: string };
