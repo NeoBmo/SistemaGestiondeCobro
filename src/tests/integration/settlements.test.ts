@@ -8,7 +8,9 @@ import {
   registerCollectorExpense,
   transferFund,
 } from "@/modules/collections/sessions";
+import { listSessions } from "@/modules/collections/queries";
 import {
+  assumeDifference,
   confirmSettlement,
   declareSettlement,
   resolveDifference,
@@ -408,6 +410,176 @@ describe("resolver la diferencia", () => {
         }),
       ),
     ).toMatchObject({ code: "SETTLEMENT_WITHOUT_DIFFERENCE" });
+  });
+});
+
+describe("diferencia asumida por el negocio (decisión del 2026-10-24)", () => {
+  const movementCount = async (businessId: string) =>
+    Number(
+      (
+        await pool.query<{ n: string }>(
+          "select count(*)::text as n from public.cash_movements where business_id = $1",
+          [businessId],
+        )
+      ).rows[0]!.n,
+    );
+
+  it("cierra la diferencia sin mover dinero, con motivo y auditoría; la liquidación no cambia", async () => {
+    const w = await world();
+    const settlement = (await declare(w, 120_000)).result.settlementId;
+    await confirm(w, settlement, 120_000, "Faltaron 30.000");
+    const mayorBefore = (await getCashSummary(pool, w.admin)).balance;
+    const movementsBefore = await movementCount(w.businessId);
+
+    const assumed = await assumeDifference(deps, w.admin, {
+      idempotencyKey: key(),
+      settlementId: settlement,
+      note: "Pérdida asumida: el cobrador no tiene cómo reponer",
+    });
+
+    expect(assumed.result).toEqual({ settlementId: settlement, amount: 30_000, kind: "FALTANTE" });
+    expect((await getCashSummary(pool, w.admin)).balance).toBe(mayorBefore);
+    expect(await movementCount(w.businessId)).toBe(movementsBefore);
+    const row = await pool.query(
+      "select status, difference::int from public.settlements where id = $1",
+      [settlement],
+    );
+    expect(row.rows[0]).toEqual({ status: "CON_DIFERENCIA", difference: 30_000 });
+    const resolution = await pool.query(
+      "select kind, movement_id, note from public.settlement_resolutions where settlement_id = $1",
+      [settlement],
+    );
+    expect(resolution.rows).toEqual([
+      {
+        kind: "ASUMIDA",
+        movement_id: null,
+        note: "Pérdida asumida: el cobrador no tiene cómo reponer",
+      },
+    ]);
+    const audit = await pool.query<{ summary: unknown }>(
+      "select summary from public.audit_events where business_id = $1 and action = 'DiferenciaAsumida'",
+      [w.businessId],
+    );
+    expect(audit.rows.map((r) => r.summary)).toEqual([
+      {
+        amount: 30_000,
+        kind: "FALTANTE",
+        note: "Pérdida asumida: el cobrador no tiene cómo reponer",
+      },
+    ]);
+    const listed = (await listSessions(pool, w.admin)).find((s) => s.id === w.sessionId)!;
+    expect(listed.settlement).toMatchObject({ resolved: true, resolution: "ASUMIDA" });
+  });
+
+  it("es una sola vez: ni se asume dos veces ni se repone después (ni al revés)", async () => {
+    const w = await world();
+    const settlement = (await declare(w, 170_000)).result.settlementId;
+    await confirm(w, settlement, 170_000, "Sobraron 20.000");
+    const first = await assumeDifference(deps, w.admin, {
+      idempotencyKey: key(),
+      settlementId: settlement,
+      note: "Sobrante queda en el negocio",
+    });
+    expect(first.result.kind).toBe("SOBRANTE");
+
+    for (const command of [assumeDifference, resolveDifference]) {
+      expect(
+        await failureOf(
+          command(deps, w.admin, { idempotencyKey: key(), settlementId: settlement, note: "x" }),
+        ),
+      ).toMatchObject({ code: "DIFFERENCE_ALREADY_RESOLVED", status: 409 });
+    }
+
+    const repuesta = await world();
+    const other = (await declare(repuesta, 120_000)).result.settlementId;
+    await confirm(repuesta, other, 120_000, "Faltaron 30.000");
+    await resolveDifference(deps, repuesta.admin, {
+      idempotencyKey: key(),
+      settlementId: other,
+      note: "Repuesto",
+    });
+    expect(
+      await failureOf(
+        assumeDifference(deps, repuesta.admin, {
+          idempotencyKey: key(),
+          settlementId: other,
+          note: "x",
+        }),
+      ),
+    ).toMatchObject({ code: "DIFFERENCE_ALREADY_RESOLVED" });
+    const listed = (await listSessions(pool, repuesta.admin)).find(
+      (s) => s.id === repuesta.sessionId,
+    )!;
+    expect(listed.settlement).toMatchObject({ resolved: true, resolution: "REPOSICION" });
+  });
+
+  it("es idempotente, rechaza una liquidación sin diferencia y solo la usa el Admin de su negocio", async () => {
+    const w = await world();
+    const settlement = (await declare(w, 120_000)).result.settlementId;
+    expect(
+      await failureOf(
+        assumeDifference(deps, w.admin, {
+          idempotencyKey: key(),
+          settlementId: settlement,
+          note: "x",
+        }),
+      ),
+    ).toMatchObject({ code: "SETTLEMENT_WITHOUT_DIFFERENCE", status: 409 });
+    await confirm(w, settlement, 120_000, "Faltaron 30.000");
+
+    const other = await world();
+    expect(
+      await failureOf(
+        assumeDifference(deps, other.admin, {
+          idempotencyKey: key(),
+          settlementId: settlement,
+          note: "x",
+        }),
+      ),
+    ).toMatchObject({ code: "SETTLEMENT_NOT_FOUND", status: 404 });
+    expect(
+      await failureOf(
+        assumeDifference(deps, w.collector, {
+          idempotencyKey: key(),
+          settlementId: settlement,
+          note: "x",
+        }),
+      ),
+    ).toMatchObject({ code: "FORBIDDEN" });
+
+    const input = { idempotencyKey: key(), settlementId: settlement, note: "Asumida" };
+    const first = await assumeDifference(deps, w.admin, input);
+    const again = await assumeDifference(deps, w.admin, input);
+    expect(again).toEqual({ result: first.result, replayed: true });
+    const count = await pool.query(
+      "select 1 from public.settlement_resolutions where settlement_id = $1",
+      [settlement],
+    );
+    expect(count.rowCount).toBe(1);
+  });
+
+  it("asumir y reponer a la vez: solo uno se aplica", async () => {
+    const w = await world();
+    const settlement = (await declare(w, 120_000)).result.settlementId;
+    await confirm(w, settlement, 120_000, "Faltaron 30.000");
+
+    const outcomes = await Promise.allSettled([
+      assumeDifference(deps, w.admin, {
+        idempotencyKey: key(),
+        settlementId: settlement,
+        note: "a",
+      }),
+      resolveDifference(deps, w.admin, {
+        idempotencyKey: key(),
+        settlementId: settlement,
+        note: "r",
+      }),
+    ]);
+
+    expect(outcomes.filter((o) => o.status === "fulfilled")).toHaveLength(1);
+    expect(
+      (outcomes.find((o) => o.status === "rejected") as PromiseRejectedResult).reason,
+    ).toMatchObject({ code: "DIFFERENCE_ALREADY_RESOLVED" });
   });
 });
 

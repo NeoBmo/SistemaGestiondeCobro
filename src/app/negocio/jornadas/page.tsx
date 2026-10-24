@@ -9,6 +9,7 @@ import { CashFeedbackProvider } from "../_components/cash-feedback";
 import {
   ConfirmSettlementForm,
   FundForm,
+  AssumeDifferenceForm,
   ResolveDifferenceForm,
 } from "./_components/session-forms";
 
@@ -100,7 +101,11 @@ export default async function SessionsPage() {
                         {cash(Math.abs(item.settlement.difference))}
                       </span>
                       {item.settlement.observation ? `: ${item.settlement.observation}` : ""}
-                      {item.settlement.resolved ? " · Resuelta" : " · Sin resolver"}
+                      {item.settlement.resolution === "REPOSICION"
+                        ? " · Resuelta por reposición"
+                        : item.settlement.resolution === "ASUMIDA"
+                          ? " · Asumida por el negocio"
+                          : " · Sin resolver"}
                     </p>
                   ) : null}
                 </div>
@@ -118,10 +123,16 @@ export default async function SessionsPage() {
                   />
                 ) : null}
                 {item.settlement?.status === "CON_DIFERENCIA" && !item.settlement.resolved ? (
-                  <ResolveDifferenceForm
-                    settlementId={item.settlement.id}
-                    difference={item.settlement.difference ?? 0}
-                  />
+                  <>
+                    <ResolveDifferenceForm
+                      settlementId={item.settlement.id}
+                      difference={item.settlement.difference ?? 0}
+                    />
+                    <AssumeDifferenceForm
+                      settlementId={item.settlement.id}
+                      difference={item.settlement.difference ?? 0}
+                    />
+                  </>
                 ) : null}
               </div>
             </li>
