@@ -10,7 +10,11 @@ import { assignClient } from "@/modules/collections/assignments";
 import { createCollector } from "@/modules/collections/collectors";
 import { createRoute } from "@/modules/collections/routes";
 import { openSession, transferFund } from "@/modules/collections/sessions";
-import { confirmSettlement, declareSettlement } from "@/modules/collections/settlements";
+import {
+  assumeDifference,
+  confirmSettlement,
+  declareSettlement,
+} from "@/modules/collections/settlements";
 import {
   getClientBehavior,
   listPortfolio,
@@ -21,6 +25,8 @@ import { saveDashboardConfig } from "@/modules/dashboard/settings";
 import { loadSessionContext, type SessionContext } from "@/modules/identity/session";
 import { createClient } from "@/modules/portfolio/clients";
 import { confirmContract } from "@/modules/portfolio/contracts";
+import { createLateFee, voidLateFee } from "@/modules/portfolio/late-fees";
+import { getLoanDetail } from "@/modules/portfolio/loan-queries";
 import { registerPayment, reversePayment } from "@/modules/portfolio/payments";
 import { addDays, isoDate, localDateIn } from "@/shared/dates/dates";
 import { AppError } from "@/shared/errors/app-error";
@@ -192,6 +198,71 @@ describe("agregados de cartera y caja", () => {
   });
 });
 
+describe("mora pendiente: indicador aparte de la cartera (decisión del 2026-10-24)", () => {
+  it("suma los cargos ACTIVO con saldo, no entra en la cartera de cuotas y «Cobrado» sí incluye sus cobros", async () => {
+    const w = await business();
+    const late = await loan(w, { principal: 300_000, installments: 3, firstOffset: -4 });
+    const other = await loan(w, { principal: 100_000, installments: 1, firstOffset: -1 });
+    const fee = (loanId: string, amount: number) =>
+      createLateFee(deps, w.actor, { idempotencyKey: key(), loanId, amount, reason: "Atraso" });
+    const partial = await fee(late.loanId, 20_000);
+    const paid = await fee(late.loanId, 5_000);
+    const voided = await fee(other.loanId, 7_000);
+    await fee(other.loanId, 3_000);
+    await registerPayment(deps, w.actor, {
+      idempotencyKey: key(),
+      loanId: late.loanId,
+      amount: 8_000,
+      lateFeeChargeId: partial.result.chargeId,
+    });
+    await registerPayment(deps, w.actor, {
+      idempotencyKey: key(),
+      loanId: late.loanId,
+      amount: 5_000,
+      lateFeeChargeId: paid.result.chargeId,
+    });
+    await voidLateFee(deps, w.actor, {
+      idempotencyKey: key(),
+      chargeId: voided.result.chargeId,
+      reason: "Error",
+    });
+
+    const data = await getDashboard(pool, w.actor);
+
+    // 12.000 del cargo parcial + 3.000 del activo sin pagos; el pagado y el anulado no cuentan.
+    expect(data.lateFees).toEqual({ pending: 15_000, charges: 2 });
+    // La cartera son solo cuotas: los cargos no la inflan.
+    expect(data.portfolio).toMatchObject({ pending: 400_000, overdue: 300_000 });
+    expect(data.collected).toBe(8_000 + 5_000);
+    // La cifra coincide con el detalle de cada préstamo.
+    const detailBalances = await Promise.all(
+      [late.loanId, other.loanId].map(
+        async (loanId) => (await getLoanDetail(pool, w.actor, loanId, new Date()))!.lateFeeBalance,
+      ),
+    );
+    expect(detailBalances.reduce((sum, n) => sum + n, 0)).toBe(data.lateFees.pending);
+    expect(data.config.widgets).toContain("LATE_FEES");
+  });
+
+  it("sin cargos es cero y no cuenta otros negocios", async () => {
+    const w = await business();
+    const foreign = await business();
+    const late = await loan(foreign, { principal: 100_000, installments: 1, firstOffset: -2 });
+    await createLateFee(deps, foreign.actor, {
+      idempotencyKey: key(),
+      loanId: late.loanId,
+      amount: 9_000,
+      reason: "x",
+    });
+
+    expect((await getDashboard(pool, w.actor)).lateFees).toEqual({ pending: 0, charges: 0 });
+    expect((await getDashboard(pool, foreign.actor)).lateFees).toEqual({
+      pending: 9_000,
+      charges: 1,
+    });
+  });
+});
+
 describe("solo lectura, zona horaria y bordes", () => {
   it("leer el dashboard, la cartera y el historial no escribe nada", async () => {
     const w = await business();
@@ -341,6 +412,17 @@ describe("jornadas, diferencias y suscripción", () => {
       count: 1,
       amount: 10_000,
     });
+    expect(data.cashBalance).toBe(2_000_000 - 100_000 + 90_000);
+
+    // Asumida por el negocio: deja de estar sin resolver y la Caja Mayor no cambia.
+    await assumeDifference(deps, w.actor, {
+      idempotencyKey: key(),
+      settlementId: declared.result.settlementId,
+      note: "Pérdida asumida",
+    });
+    data = await getDashboard(pool, w.actor);
+    expect(data.sessions).toMatchObject({ unresolvedDifferences: 0, unresolvedAmount: 0 });
+    expect(data.alerts.map((alert) => alert.kind)).not.toContain("UNRESOLVED_DIFFERENCES");
     expect(data.cashBalance).toBe(2_000_000 - 100_000 + 90_000);
   });
 

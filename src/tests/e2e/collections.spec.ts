@@ -106,12 +106,17 @@ test("el Admin crea un cobrador y su ruta, asigna un cliente, da fondo y confirm
   await expect(page.getByText(/Liquidación con faltante de \$10\.000/)).toBeVisible();
   await expect(page.getByTestId("jornada")).toContainText("Liquidada con diferencia");
 
-  // Resolver la diferencia entra el faltante a la Caja Mayor.
-  await page.getByRole("button", { name: "Resolver diferencia" }).click();
+  // Dos formas de resolver (02 §5.5): reposición (ajuste) o asumida por el negocio (sin dinero).
+  await expect(page.getByRole("button", { name: "Asumir diferencia" })).toBeVisible();
+  // La reposición entra el faltante a la Caja Mayor.
+  await page.getByRole("button", { name: "Registrar reposición" }).click();
   await page.getByLabel(/^Motivo/).fill("El cobrador repuso el faltante");
   await page.getByRole("button", { name: "Registrar ajuste" }).click();
   await expect(page.getByText(/Diferencia resuelta con un ajuste de \$10\.000/)).toBeVisible();
-  await expect(page.getByTestId("jornada")).toContainText("Resuelta");
+  await expect(page.getByTestId("jornada")).toContainText("Resuelta por reposición");
+  // Una sola vez: ya no se ofrece ninguna de las dos.
+  await expect(page.getByRole("button", { name: "Asumir diferencia" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Registrar reposición" })).toHaveCount(0);
   await page.goto("/negocio/caja");
   await expect(page.getByTestId("saldo")).toHaveText("$1.000.000");
 

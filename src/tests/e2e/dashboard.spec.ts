@@ -84,6 +84,9 @@ test("el Admin ve el resumen con alertas derivadas y filtra la cartera por prior
   // Cartera pendiente: 200.000 (3.ª) + 100.000 (2.ª) de Zoila + 300.000 de Beatriz = 500.000; vencida 200.000.
   await expect(page.getByTestId("cartera-pendiente")).toHaveText("$500.000");
   await expect(page.getByTestId("cartera-vencida")).toHaveText("$200.000");
+  // La cartera se rotula como solo cuotas; la mora pendiente es un indicador aparte (sin cargos: cero).
+  await expect(page.getByTestId("widget-PORTFOLIO_PENDING")).toContainText("(cuotas)");
+  await expect(page.getByTestId("mora-pendiente")).toHaveText("$0");
   await expect(page.getByTestId("cobrado")).toHaveText("$100.000");
   await expect(page.getByTestId("saldo-caja")).toHaveText("$1.500.000");
   await expect(page.getByTestId("alertas")).toContainText(

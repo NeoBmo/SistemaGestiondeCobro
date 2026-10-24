@@ -215,6 +215,8 @@ export type SessionListItem = {
     difference: number | null;
     observation: string | null;
     resolved: boolean;
+    /** Cómo se resolvió la diferencia: reposición con un ajuste o asumida por el negocio (02 §5.5). */
+    resolution: "REPOSICION" | "ASUMIDA" | null;
   } | null;
 };
 
@@ -240,7 +242,7 @@ export async function listSessions(db: Db, actor: SessionContext): Promise<Sessi
     received_amount: string | null;
     difference: string | null;
     observation: string | null;
-    resolved: boolean | null;
+    resolution: "REPOSICION" | "ASUMIDA" | null;
   }>(
     `select s.id, c.id as collector_id, c.name as collector_name, s.status, s.business_date::text,
             s.opened_at,
@@ -257,7 +259,7 @@ export async function listSessions(db: Db, actor: SessionContext): Promise<Sessi
                               when m.direction = 'ENTRADA' then m.amount else -m.amount end), 0)::text as expected,
             st.id as settlement_id, st.status as settlement_status, st.declared_amount::text,
             st.received_amount::text, st.difference::text, st.observation,
-            exists (select 1 from public.settlement_resolutions r where r.settlement_id = st.id) as resolved
+            (select r.kind from public.settlement_resolutions r where r.settlement_id = st.id) as resolution
        from public.cash_sessions s
        join public.collectors c on c.id = s.collector_id
        left join public.cash_movements m on m.session_id = s.id
@@ -286,7 +288,8 @@ export async function listSessions(db: Db, actor: SessionContext): Promise<Sessi
           receivedAmount: row.received_amount === null ? null : Number(row.received_amount),
           difference: row.difference === null ? null : Number(row.difference),
           observation: row.observation,
-          resolved: Boolean(row.resolved),
+          resolved: row.resolution !== null,
+          resolution: row.resolution,
         }
       : null,
   }));

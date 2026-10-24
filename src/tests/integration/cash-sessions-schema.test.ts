@@ -766,6 +766,36 @@ describe("liquidación", () => {
       ).toBe(CHECK_VIOLATION);
     });
   });
+
+  it("la diferencia asumida se cierra sin movimiento; la reposición no puede omitirlo (02 §5.5)", async () => {
+    await withRollback(pool, async (client) => {
+      const w = await world(client);
+      const session = await openSession(client, w);
+      await fund(client, w, session, 100);
+      await declare(client, w, session, 90);
+      await confirm(client, w, session, 100, 90, "Faltaron 10");
+      const settlement = (
+        await client.query<{ id: string }>(
+          "select id from public.settlements where session_id = $1",
+          [session],
+        )
+      ).rows[0]!.id;
+      const adjustment = await mayor(client, w, "AJUSTE", "ENTRADA", 10, { reason: "x" });
+      const resolve = (kind: string, movement: string | null) =>
+        attempt(
+          client,
+          "insert into public.settlement_resolutions (business_id, settlement_id, movement_id, note, resolved_by, kind) values ($1, $2, $3, 'x', $4, $5)",
+          [w.business, settlement, movement, w.admin, kind],
+        );
+
+      expect((await resolve("REPOSICION", null))?.code).toBe(CHECK_VIOLATION);
+      expect((await resolve("ASUMIDA", adjustment))?.code).toBe(CHECK_VIOLATION);
+      expect((await resolve("OTRA", null))?.code).toBe(CHECK_VIOLATION);
+      expect(await resolve("ASUMIDA", null)).toBeNull();
+      // Una sola resolución por liquidación, sea del tipo que sea.
+      expect((await resolve("REPOSICION", adjustment))?.code).toBe(UNIQUE_VIOLATION);
+    });
+  });
 });
 
 describe("aislamiento y acceso", () => {
