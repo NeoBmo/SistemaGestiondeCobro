@@ -7,7 +7,7 @@
 
 - `docs/planning/02-DOMINIO.md` manda en reglas de negocio.
 - `docs/planning/03-ARQUITECTURA.md` y las decisiones aceptadas en `docs/adr/` mandan en arquitectura.
-- `docs/planning/04-PLAN.md` define fases y criterios de salida; `05-PENDIENTES.md` registra lo no decidido.
+- `docs/planning/04-PLAN.md` define fases y criterios de salida; `05-PENDIENTES.md` registra lo no decidido; `09-MEJORAS-POST-V1.md`, lo decidido para después de V1 (no se construye antes).
 - Este archivo es la guía operativa; no es una autoridad superior a las anteriores.
 - Skills y agentes describen procedimientos; no pueden cambiar las fuentes anteriores.
 

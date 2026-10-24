@@ -68,7 +68,13 @@ Recuperación de contraseña: el admin del negocio restablece la de sus cobrador
 Roles: `SUPER_ADMIN` (sin negocio), `ADMIN_NEGOCIO` (una sola cuenta principal por negocio en V1), `COBRADOR` (pertenece a un negocio, vinculado a un cobrador).
 Estados: `ACTIVO`, `BLOQUEADO`, `PENDIENTE_CAMBIO_CONTRASENA`.
 Reglas: la identificación personal nunca es contraseña; contraseña inicial temporal obliga cambio en primer acceso; política de contraseña: 8 o más caracteres con al menos una letra y un dígito (ADR 0004); un cobrador no actúa sobre otro negocio ni otra cartera.
-Eventos: `UsuarioCreado`, `PrimerAccesoCompletado`, `InicioSesion`, `UsuarioBloqueado`, `ContrasenaCambiada`, `ContrasenaRestablecida`.
+Decisiones del 2026-10-24:
+- **Inmutables en V1:** el rol, el negocio y el nombre de usuario de un perfil no cambian (cambiar un rol exigiría refrescar el JWT); si hace falta otro rol, se crea otro usuario.
+- **Límite de intentos en la aplicación** (Supabase Auth ve la IP del servidor, así que su límite es global): 5 fallos seguidos de un mismo usuario en 15 minutos lo bloquean 15 minutos; más de 30 fallos desde una misma IP en 15 minutos la bloquean 15 minutos. Sin CAPTCHA en V1.
+- **Inicios de sesión fallidos:** se registran como eventos de seguridad (usuario intentado, IP, fecha y motivo; nunca la contraseña), separados de la auditoría de negocio; son la base del límite de intentos.
+- **Alta de Super Admin:** la única vía es el script de administración; exige un motivo y registra un evento de auditoría con el usuario del sistema operativo que lo ejecutó, el motivo y la fecha.
+- **Sin 2FA en V1** (lista de mejoras posteriores, `09-MEJORAS-POST-V1.md`).
+Eventos: `UsuarioCreado`, `PrimerAccesoCompletado`, `InicioSesion`, `InicioSesionFallido` (evento de seguridad), `UsuarioBloqueado`, `ContrasenaCambiada`, `ContrasenaRestablecida`, `SuperAdminCreado`.
 
 ---
 
@@ -297,7 +303,7 @@ Reglas (ADR 0011): lo crea el Admin del negocio y solo su negocio lo ve; el Supe
 
 Registra la **acción**, no el hecho financiero mismo.
 Datos: negocio opcional, actor, tipo de acción, entidad afectada, id de entidad, fecha/hora, resultado, resumen seguro del cambio.
-Resultado: `OK` (el comando se aplicó) o `RECHAZADO` (el actor estaba autenticado pero no tenía permiso sobre esa entidad). No se auditan los rechazos por datos inválidos ni los intentos de inicio de sesión fallidos (ADR 0005).
+Resultado: `OK` (el comando se aplicó) o `RECHAZADO` (el actor estaba autenticado pero no tenía permiso sobre esa entidad). No se auditan los rechazos por datos inválidos (ADR 0005). Los inicios de sesión fallidos no son auditoría de negocio: van al registro de eventos de seguridad (§1.4, decisión del 2026-10-24).
 Se crea para: contratos, préstamos, pagos, cargos de mora, rutas, asignaciones, cajas, gastos, liquidaciones, suscripciones, usuarios, tickets.
 
 ---
