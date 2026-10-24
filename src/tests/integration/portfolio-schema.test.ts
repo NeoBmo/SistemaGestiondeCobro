@@ -127,10 +127,12 @@ describe("clientes", () => {
     });
   });
 
-  it("el contacto se edita, pero no la identificación, el negocio ni el origen; y nunca se elimina", async () => {
+  // 02 §2.1 (decisión del 2026-10-24): un cliente con contratos no se elimina; sin ellos, sí.
+  it("el contacto se edita, pero no la identificación, el negocio ni el origen; con contratos no se elimina", async () => {
     await withRollback(pool, async (client) => {
       const s = await seed(client);
       const id = await insertClient(client, s);
+      await insertContract(client, s, id);
 
       expect(
         await attempt(
@@ -147,6 +149,11 @@ describe("clientes", () => {
       ]) {
         expect((await attempt(client, statement, [id]))?.code, statement).toBe(RESTRICT_VIOLATION);
       }
+
+      const withoutHistory = await insertClient(client, s, { identification: "sin-historial" });
+      expect(
+        await attempt(client, "delete from public.clients where id = $1", [withoutHistory]),
+      ).toBeNull();
     });
   });
 

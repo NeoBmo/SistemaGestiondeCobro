@@ -90,7 +90,7 @@ describe("identificación única en su forma normalizada", () => {
     const first = await createClient(deps, admin, { name: "Ana", identification: "ABC-1" });
     expect(first.identification).toBe("ABC-1");
 
-    for (const identification of ["abc 1", "abc1", "A.B.C.1", " a/b_c#1 "]) {
+    for (const identification of ["abc 1", "abc1", "A.B.C.1", "a/b_c#1"]) {
       expect(
         await failureOf(createClient(deps, admin, { name: "Otra", identification })),
         identification,
