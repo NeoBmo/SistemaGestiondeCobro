@@ -38,14 +38,39 @@ for (const path of privatePages) {
   });
 }
 
-test("la landing muestra los tres planes sin cifras de precio", async ({ page }) => {
+// Precios V1 decididos el 2026-10-24 (02-DOMINIO §1.1): la landing muestra los tres y destaca el anual.
+test("la landing muestra los tres planes con sus precios y el anual recomendado", async ({
+  page,
+}) => {
   await page.goto("/");
 
   const plans = page.getByRole("region", { name: "Planes" });
-  for (const name of ["Semanal", "Mensual", "Anual"]) {
+  const card = (name: string) =>
+    plans.getByRole("listitem").filter({ has: page.getByRole("heading", { level: 3, name }) });
+  for (const [name, price] of [
+    ["Semanal", "$25.000"],
+    ["Mensual", "$100.000"],
+    ["Anual", "$960.000"],
+  ] as const) {
     await expect(plans.getByRole("heading", { level: 3, name })).toBeVisible();
+    await expect(card(name)).toContainText(price);
   }
-  await expect(plans).not.toContainText(/\$\s?\d/);
+
+  const annual = card("Anual");
+  await expect(annual).toContainText("Recomendado");
+  await expect(annual).toContainText(/Ahorras 20\s%/);
+  // El precio de referencia va tachado y con texto visible que dice qué es: no depende del color ni
+  // de que el lector de pantalla anuncie el tachado.
+  await expect(annual.locator("del")).toHaveText("$1.200.000");
+  await expect(annual).toContainText("Sin descuento: $1.200.000");
+  for (const name of ["Semanal", "Mensual"]) {
+    await expect(card(name)).not.toContainText(/Recomendado|Ahorras/);
+    await expect(card(name).locator("del")).toHaveCount(0);
+  }
+  for (const amount of await plans.locator("del, .text-2xl").all()) {
+    await expect(amount).toHaveClass(/font-mono/);
+    await expect(amount).toHaveClass(/tabular-nums/);
+  }
   await expect(page.getByRole("link", { name: "Iniciar sesión" }).first()).toHaveAttribute(
     "href",
     "/login",
