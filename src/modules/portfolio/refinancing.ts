@@ -11,6 +11,12 @@ import { assertFirstDueNotBeforeDisbursement, type ContractDeps } from "./contra
 import { calculateLoan, type LoanPlan } from "./loan-calculation";
 import type { RefinanceInput, RefinanceTermsInput } from "./loan-validation";
 import {
+  assertUsuryAcknowledged,
+  assessUsury,
+  usuryAuditSummary,
+  type UsuryAssessment,
+} from "./usury";
+import {
   activeChargeBalance,
   assertLoanActive,
   installmentsWithApplied,
@@ -85,6 +91,8 @@ export type RefinancePreview = {
   cashBalance: number;
   /** Solo el monto adicional sale de la caja. */
   sufficientFunds: boolean;
+  /** TEA del préstamo nuevo frente a la usura vigente (02 §2.3): advierte, no bloquea. */
+  usury: UsuryAssessment;
 };
 
 /** Calcula la refinanciación sin guardar nada. */
@@ -129,6 +137,7 @@ export async function previewRefinancing(
     disbursedOn,
     cashBalance,
     sufficientFunds: cashBalance >= terms.additionalAmount,
+    usury: await assessUsury(db, plan, disbursedOn),
   };
 }
 
@@ -197,6 +206,9 @@ export function refinanceLoan(
       const disbursedOn = localDateIn(now(), actor.businessTimeZone);
       assertFirstDueNotBeforeDisbursement(input.firstDueOn, disbursedOn);
       const plan = planFor(previous, input);
+      // Por encima de la usura vigente solo se confirma con la advertencia marcada (409 si no).
+      const usury = await assessUsury(tx, plan, disbursedOn);
+      assertUsuryAcknowledged(usury, input.acknowledgeUsuryWarning);
 
       const number = (
         await tx.query<{ number: string }>("select private.next_contract_number($1) as number", [
@@ -344,7 +356,7 @@ export function refinanceLoan(
             action: "ContratoConfirmado",
             entityType: "contract",
             entityId: contractId,
-            summary: { number },
+            summary: { number, usury: usuryAuditSummary(usury) },
           },
           {
             action: "PrestamoCreado",

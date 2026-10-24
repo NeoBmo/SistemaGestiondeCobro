@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { parseAmountInput } from "@/modules/cash/amount-input";
 import { LOAN_FREQUENCIES, type LoanFrequency } from "@/modules/portfolio/loan-calculation";
+import type { UsuryAssessment } from "@/modules/portfolio/usury";
 import { formatIsoDate, isoDate } from "@/shared/dates/dates";
 import { formatMoney, money } from "@/shared/money/money";
 import { Alert } from "@/shared/ui/alert";
@@ -15,6 +16,7 @@ import { TextField } from "@/shared/ui/text-field";
 import { useCommand } from "@/shared/ui/use-command";
 import { useCashFeedback } from "../../_components/cash-feedback";
 import { parsePercent } from "./percent";
+import { UsuryNotice } from "./usury-notice";
 
 const FREQUENCY_OPTIONS = LOAN_FREQUENCIES.map((value) => ({
   value,
@@ -34,6 +36,7 @@ type Preview = {
   disbursedOn: string;
   cashBalance: number;
   sufficientFunds: boolean;
+  usury: UsuryAssessment;
 };
 
 type Done = { newLoanId: string; newContractNumber: string; balance: number };
@@ -75,6 +78,7 @@ export function RefinanceLoan({
   const [open, setOpen] = useState(false);
   const [terms, setTerms] = useState<Terms | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [usuryAcknowledged, setUsuryAcknowledged] = useState(false);
   const errorRef = useRef<HTMLDivElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const openerRef = useRef<HTMLButtonElement>(null);
@@ -99,6 +103,7 @@ export function RefinanceLoan({
   function discardPreview() {
     if (preview.state.status !== "idle") preview.reset();
     if (confirm.state.status === "error") confirm.reset();
+    setUsuryAcknowledged(false);
     idempotency.renew();
   }
 
@@ -133,8 +138,11 @@ export function RefinanceLoan({
   }
 
   async function onConfirm() {
-    if (!terms) return;
-    const result = await confirm.run(terms, {
+    if (!terms || !planned) return;
+    const body = planned.usury.exceeds
+      ? { ...terms, acknowledgeUsuryWarning: usuryAcknowledged }
+      : terms;
+    const result = await confirm.run(body, {
       headers: { "Idempotency-Key": idempotency.current() },
     });
     if (result.status === "success") {
@@ -305,6 +313,12 @@ export function RefinanceLoan({
               </li>
             ))}
           </ol>
+          <UsuryNotice
+            usury={planned.usury}
+            acknowledged={usuryAcknowledged}
+            onAcknowledgedChange={setUsuryAcknowledged}
+            disabled={confirming}
+          />
           {confirm.state.status === "error" ? (
             <div className="mt-3">
               <Alert variant="error" ref={errorRef}>
@@ -316,7 +330,7 @@ export function RefinanceLoan({
             className="mt-4"
             loading={confirming}
             loadingText="Refinanciando…"
-            disabled={!planned.sufficientFunds}
+            disabled={!planned.sufficientFunds || (planned.usury.exceeds && !usuryAcknowledged)}
             onClick={onConfirm}
           >
             Refinanciar

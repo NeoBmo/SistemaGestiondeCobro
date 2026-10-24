@@ -15,6 +15,7 @@ import { SelectField } from "@/shared/ui/select-field";
 import { TextAreaField } from "@/shared/ui/text-area-field";
 import { TextField } from "@/shared/ui/text-field";
 import { useCommand } from "@/shared/ui/use-command";
+import { UsuryNotice } from "../_components/usury-notice";
 
 const FREQUENCY_OPTIONS = LOAN_FREQUENCIES.map((value) => ({
   value,
@@ -59,6 +60,7 @@ export function LoanForm({ clientId, clientName, suggestedFirstDueOn }: Props) {
   const confirm = useCommand<ConfirmedContract>("/api/negocio/prestamos");
   const [terms, setTerms] = useState<(Terms & { comment?: string }) | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [usuryAcknowledged, setUsuryAcknowledged] = useState(false);
   const [idempotency] = useState(() => createIdempotencyKeyHolder());
   const errorRef = useRef<HTMLDivElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
@@ -76,6 +78,7 @@ export function LoanForm({ clientId, clientName, suggestedFirstDueOn }: Props) {
   function discardPreview() {
     if (preview.state.status !== "idle") preview.reset();
     if (confirm.state.status === "error") confirm.reset();
+    setUsuryAcknowledged(false);
     idempotency.renew();
   }
 
@@ -109,8 +112,11 @@ export function LoanForm({ clientId, clientName, suggestedFirstDueOn }: Props) {
   }
 
   async function onConfirm() {
-    if (!terms) return;
-    const result = await confirm.run(terms, {
+    if (!terms || !planned) return;
+    const body = planned.usury.exceeds
+      ? { ...terms, acknowledgeUsuryWarning: usuryAcknowledged }
+      : terms;
+    const result = await confirm.run(body, {
       headers: { "Idempotency-Key": idempotency.current() },
     });
     if (result.status === "success") {
@@ -277,6 +283,13 @@ export function LoanForm({ clientId, clientName, suggestedFirstDueOn }: Props) {
             </div>
           )}
 
+          <UsuryNotice
+            usury={planned.usury}
+            acknowledged={usuryAcknowledged}
+            onAcknowledgedChange={setUsuryAcknowledged}
+            disabled={confirming}
+          />
+
           {confirm.state.status === "error" ? (
             <div className="mt-4">
               <Alert variant="error" ref={errorRef}>
@@ -303,7 +316,11 @@ export function LoanForm({ clientId, clientName, suggestedFirstDueOn }: Props) {
             onClick={onConfirm}
             loading={confirming}
             loadingText="Confirmando…"
-            disabled={!planned.sufficientFunds || calculating}
+            disabled={
+              !planned.sufficientFunds ||
+              calculating ||
+              (planned.usury.exceeds && !usuryAcknowledged)
+            }
           >
             Confirmar préstamo y desembolsar
           </Button>
