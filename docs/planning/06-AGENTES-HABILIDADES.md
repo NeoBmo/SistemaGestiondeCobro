@@ -31,9 +31,9 @@ Este proyecto tiene un riesgo específico de "código espagueti": mezclar la cap
 - **Supabase MCP** (si está disponible): consultar el esquema real, RLS y migraciones aplicadas sin salir de la sesión, para evitar que un agente proponga una migración que ya existe o contradiga una política de RLS vigente.
 - **GitHub/Git**: para que las fases de `04-PLAN.md` se reflejen en historial de commits/PRs claramente delimitado por fase — facilita auditar qué fase introdujo qué.
 
-## 5. Regla de convivencia con instrucciones compartidas
+## 5. Regla de convivencia con `CLAUDE.md`
 
-`AGENTS.md` es la entrada común para Codex, Claude Code y OpenCode. `CLAUDE.md` importa `@AGENTS.md` por compatibilidad con Claude Code. Las reglas de negocio se rigen por `02-DOMINIO.md`; las técnicas, por `03-ARQUITECTURA.md` y los ADR aceptados. Los subagentes de este documento operacionalizan esas fuentes, no las reemplazan.
+Claude Code es la única herramienta agéntica del proyecto (ADR 0014). `CLAUDE.md` es la única guía operativa; subagentes en `.claude/agents/`, skills en `.claude/skills/` y permisos/hooks en `.claude/settings.json`. Las reglas de negocio se rigen por `02-DOMINIO.md`; las técnicas, por `03-ARQUITECTURA.md` y los ADR aceptados. Los subagentes de este documento operacionalizan esas fuentes, no las reemplazan.
 
 ## 6. Qué mantener actualizado a mano (no automatizable)
 

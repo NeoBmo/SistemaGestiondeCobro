@@ -7,6 +7,6 @@
 /src/tests/** @NeoBmo @Lballest25
 /docs/frontend/** @NeoBmo
 /docs/planning/** @NeoBmo @Lballest25
-/AGENTS.md @NeoBmo @Lballest25
 /CLAUDE.md @NeoBmo @Lballest25
+/.claude/** @NeoBmo @Lballest25
 /.github/** @NeoBmo @Lballest25
