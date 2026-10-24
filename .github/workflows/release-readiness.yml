@@ -1,0 +1,32 @@
+name: Guarda de lanzamiento
+
+# INV-034: antes de lanzar, comprueba que no quedan bloqueantes (identidad provisional, URL pública de
+# ejemplo, pendientes que bloquean F8). Fuera del CI normal a propósito: hasta F8 falla por diseño.
+# Uso: docs/operacion/LANZAMIENTO.md
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Las acciones se fijan por SHA de commit (el tag va en el comentario).
+jobs:
+  readiness:
+    name: Bloqueantes de producción
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+      # El script solo usa módulos de Node: no necesita npm ci.
+      - run: npm run check:production-readiness
+        env:
+          NODE_ENV: production
+          PUBLIC_SITE_URL: ${{ vars.PUBLIC_SITE_URL }}

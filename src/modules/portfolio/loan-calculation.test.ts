@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { isoDate } from "@/shared/dates/dates";
 import { AppError } from "@/shared/errors/app-error";
+import { money } from "@/shared/money/money";
 import {
   MAX_INSTALLMENTS,
   MAX_INTEREST_BPS,
   MAX_PRINCIPAL,
+  assertMismatchAcknowledged,
   calculateImportedLoan,
   calculateLoan,
+  historicalDifference,
   type ImportedLoanTerms,
   type LoanTerms,
 } from "./loan-calculation";
@@ -298,5 +301,131 @@ describe("préstamo importado (02 §6.1, ADR 0007)", () => {
     expect(() => calculateImportedLoan(imported({ firstDueOn: "2026-02-30" as never }))).toThrow(
       AppError,
     );
+  });
+});
+
+describe("montos por cuota de un préstamo importado (02 §6.1)", () => {
+  const imported = (overrides: Partial<ImportedLoanTerms> = {}): ImportedLoanTerms => ({
+    ...terms(),
+    pendingBalance: 600_000,
+    installmentCount: 3,
+    firstDueOn: isoDate("2026-10-20"),
+    ...overrides,
+  });
+
+  it("sin montos propone el reparto en partes iguales y no lo marca como cambiado", () => {
+    const plan = calculateImportedLoan(imported({ pendingBalance: 1_000_000 }));
+    expect(plan.installments.map((i) => i.amount)).toEqual([333_333, 333_333, 333_334]);
+    expect(plan.customAmounts).toBe(false);
+  });
+
+  it("usa los montos escritos si suman exactamente el saldo, con fechas y numeración del calendario", () => {
+    const plan = calculateImportedLoan(
+      imported({ frequency: "SEMANAL", installmentAmounts: [50_000, 250_000, 300_000] }),
+    );
+    expect(plan.installments).toEqual([
+      { number: 1, dueOn: "2026-10-20", amount: 50_000 },
+      { number: 2, dueOn: "2026-10-27", amount: 250_000 },
+      { number: 3, dueOn: "2026-11-03", amount: 300_000 },
+    ]);
+    expect(plan.scheduled).toBe(600_000);
+    expect(plan.customAmounts).toBe(true);
+  });
+
+  it("enviar exactamente el reparto propuesto no cuenta como cambio", () => {
+    const plan = calculateImportedLoan(
+      imported({ installmentAmounts: [200_000, 200_000, 200_000] }),
+    );
+    expect(plan.customAmounts).toBe(false);
+  });
+
+  it("rechaza una suma distinta del saldo, por un peso de más o de menos", () => {
+    for (const installmentAmounts of [
+      [200_000, 200_000, 199_999],
+      [200_000, 200_000, 200_001],
+    ]) {
+      expect(
+        () => calculateImportedLoan(imported({ installmentAmounts })),
+        installmentAmounts.join(","),
+      ).toThrow(expect.objectContaining({ code: "INSTALLMENT_AMOUNTS_SUM_MISMATCH", status: 400 }));
+    }
+    expect(() =>
+      calculateImportedLoan(imported({ installmentAmounts: [200_000, 200_000, 199_999] })),
+    ).toThrow("Las cuotas suman $599.999 y el saldo pendiente es $600.000");
+  });
+
+  it("una suma enorme no se desborda: se rechaza como mayor que el saldo", () => {
+    const huge = Number.MAX_SAFE_INTEGER - 1;
+    expect(() =>
+      calculateImportedLoan(imported({ installmentAmounts: [huge, huge, huge] })),
+    ).toThrow(expect.objectContaining({ code: "INSTALLMENT_AMOUNTS_SUM_MISMATCH" }));
+  });
+
+  it("rechaza una cantidad de montos distinta del número de cuotas", () => {
+    for (const installmentAmounts of [[600_000], [100_000, 100_000, 100_000, 300_000], []]) {
+      expect(() => calculateImportedLoan(imported({ installmentAmounts }))).toThrow(
+        expect.objectContaining({ code: "INSTALLMENT_AMOUNTS_COUNT_MISMATCH" }),
+      );
+    }
+  });
+
+  it("rechaza montos en cero, negativos o con decimales aunque la suma cuadre", () => {
+    for (const installmentAmounts of [
+      [0, 300_000, 300_000],
+      [-100_000, 350_000, 350_000],
+      [100_000.5, 199_999.5, 300_000],
+    ]) {
+      expect(
+        () => calculateImportedLoan(imported({ installmentAmounts })),
+        installmentAmounts.join(","),
+      ).toThrow(expect.objectContaining({ code: "INVALID_INSTALLMENT_AMOUNT" }));
+    }
+  });
+});
+
+describe("descuadre histórico de un préstamo importado (02 §6.1)", () => {
+  const plan = { total: 1_200_000, scheduled: 700_000 } as Parameters<
+    typeof historicalDifference
+  >[0];
+
+  it("es total − pagado − pendiente, y no existe si no se conoce lo pagado", () => {
+    expect(historicalDifference(plan, 500_000)).toBe(0);
+    expect(historicalDifference(plan, 100_000)).toBe(400_000);
+    expect(historicalDifference(plan, 600_000)).toBe(-100_000);
+    expect(historicalDifference(plan, 0)).toBe(500_000);
+    expect(historicalDifference(plan, undefined)).toBeNull();
+  });
+
+  it("si cuadra (o no hay dato) no exige nada ni devuelve observación", () => {
+    expect(assertMismatchAcknowledged(money(0), {})).toBeNull();
+    expect(assertMismatchAcknowledged(null, {})).toBeNull();
+    expect(assertMismatchAcknowledged(money(0), { confirmMismatch: true, mismatchNote: "x" })).toBe(
+      null,
+    );
+  });
+
+  it("si no cuadra exige confirmación explícita (409) y una observación no vacía (400)", () => {
+    for (const difference of [money(400_000), money(-1)]) {
+      expect(() => assertMismatchAcknowledged(difference, {})).toThrow(
+        expect.objectContaining({ code: "IMPORT_MISMATCH_UNCONFIRMED", status: 409 }),
+      );
+      expect(() =>
+        assertMismatchAcknowledged(difference, { confirmMismatch: false, mismatchNote: "Abonos" }),
+      ).toThrow(expect.objectContaining({ code: "IMPORT_MISMATCH_UNCONFIRMED" }));
+      for (const mismatchNote of [undefined, "", "   "]) {
+        expect(() =>
+          assertMismatchAcknowledged(difference, { confirmMismatch: true, mismatchNote }),
+        ).toThrow(expect.objectContaining({ code: "IMPORT_MISMATCH_NOTE_REQUIRED", status: 400 }));
+      }
+    }
+  });
+
+  it("con confirmación y observación devuelve la observación para la auditoría", () => {
+    expect(
+      assertMismatchAcknowledged(money(400_000), {
+        confirmMismatch: true,
+        mismatchNote: "  Abonos de interés sin registrar ",
+      }),
+    ).toBe("Abonos de interés sin registrar");
   });
 });

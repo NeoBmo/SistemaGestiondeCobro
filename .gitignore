@@ -34,3 +34,7 @@ coverage/
 playwright-report/
 test-results/
 .vercel/
+
+# Artefactos locales de agentes y herramientas
+.playwright-mcp/
+.worktrees/

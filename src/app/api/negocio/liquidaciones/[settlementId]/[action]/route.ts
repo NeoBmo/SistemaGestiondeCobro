@@ -1,4 +1,8 @@
-import { confirmSettlement, resolveDifference } from "@/modules/collections/settlements";
+import {
+  assumeDifference,
+  confirmSettlement,
+  resolveDifference,
+} from "@/modules/collections/settlements";
 import {
   collectionsIdSchema,
   confirmSettlementSchema,
@@ -19,11 +23,16 @@ import { parseIdempotencyKey } from "@/shared/ids/idempotency-key";
 
 type RouteContext = { params: Promise<{ settlementId: string; action: string }> };
 
-const COMMAND = { confirmar: "ConfirmarLiquidacion", resolver: "ResolverDiferencia" } as const;
+const COMMAND = {
+  confirmar: "ConfirmarLiquidacion",
+  resolver: "ResolverDiferencia",
+  asumir: "AsumirDiferencia",
+} as const;
 
 /**
- * El Admin confirma una liquidación (`confirmar`, con lo que realmente recibió) o resuelve su diferencia
- * (`resolver`, con un ajuste de la Caja Mayor). Se autoriza antes de validar el id, la clave y el cuerpo.
+ * El Admin confirma una liquidación (`confirmar`, con lo que realmente recibió) o resuelve su diferencia:
+ * por reposición (`resolver`, con un ajuste de la Caja Mayor) o asumida por el negocio (`asumir`, sin mover
+ * dinero). Se autoriza antes de validar el id, la clave y el cuerpo.
  */
 export async function POST(request: Request, context: RouteContext): Promise<Response> {
   try {
@@ -51,7 +60,7 @@ export async function POST(request: Request, context: RouteContext): Promise<Res
             settlementId: settlementId.data,
             idempotencyKey,
           })
-        : await resolveDifference({ db }, actor, {
+        : await (action === "resolver" ? resolveDifference : assumeDifference)({ db }, actor, {
             ...parseBody(resolveDifferenceSchema, body),
             settlementId: settlementId.data,
             idempotencyKey,

@@ -3,7 +3,9 @@ import {
   PLAN_CATALOG,
   collectorsLabel,
   dashboardLabel,
+  discountPercent,
 } from "@/modules/subscriptions/plan-catalog";
+import { formatMoney } from "@/shared/money/money";
 
 const QUESTIONS = [
   "Cuánto dinero se prestó, se recibió, se gastó y permanece en movimiento.",
@@ -52,14 +54,45 @@ export default function LandingPage() {
           Planes
         </h2>
         <p className="text-muted text-sm">
-          Todos incluyen cartera, cobros, cajas y liquidaciones. Consulta los precios con el equipo
-          de Cuadre.
+          Todos incluyen cartera, cobros, cajas y liquidaciones. Precios en pesos colombianos.
         </p>
         <ul className="grid gap-4 md:grid-cols-3">
           {PLAN_CATALOG.map((plan) => (
-            <li key={plan.code} className="border-border flex flex-col gap-2 rounded-lg border p-4">
-              <h3 className="text-lg font-medium">{plan.name}</h3>
-              <p className="font-semibold">{plan.relativePrice}</p>
+            <li
+              key={plan.code}
+              className={`flex flex-col gap-2 rounded-lg p-4 ${
+                plan.recommended ? "border-primary border-2" : "border-border border"
+              }`}
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className="text-lg font-medium">{plan.name}</h3>
+                {plan.recommended && (
+                  <span className="border-primary bg-primary-subtle text-foreground inline-flex items-center gap-1 rounded-sm border px-2 py-1 text-xs font-medium">
+                    <span aria-hidden="true">★</span>
+                    Recomendado
+                  </span>
+                )}
+              </div>
+              <p className="flex flex-wrap items-baseline gap-x-2">
+                <span className="font-mono text-2xl font-semibold tabular-nums">
+                  {formatMoney(plan.priceAmount)}
+                </span>
+                <span className="text-muted text-sm">{plan.pricePeriod}</span>
+              </p>
+              {plan.referencePriceAmount !== null && (
+                <p className="flex flex-wrap items-center gap-2 text-sm">
+                  {/* <del> no se anuncia en la mayoría de lectores: el texto visible da el sentido. */}
+                  <span className="text-muted">
+                    Sin descuento:{" "}
+                    <del className="font-mono tabular-nums">
+                      {formatMoney(plan.referencePriceAmount)}
+                    </del>
+                  </span>
+                  <span className="border-success bg-success-subtle text-success-strong rounded-sm border px-2 py-1 text-xs font-medium">
+                    Ahorras {discountPercent(plan.priceAmount, plan.referencePriceAmount)} %
+                  </span>
+                </p>
+              )}
               <ul className="flex flex-col gap-1 text-base">
                 <li>Vigencia: {plan.validity}</li>
                 <li>{collectorsLabel(plan.maxActiveCollectors)}</li>

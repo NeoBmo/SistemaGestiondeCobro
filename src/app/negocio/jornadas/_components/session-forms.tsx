@@ -79,10 +79,10 @@ export function ResolveDifferenceForm({
 }) {
   return (
     <CommandForm<{ amount: number; balance: number }>
-      title="Resolver la diferencia"
+      title="Resolver la diferencia por reposición"
       url={`/api/negocio/liquidaciones/${settlementId}/resolver`}
       idempotent
-      openLabel="Resolver diferencia"
+      openLabel={difference > 0 ? "Registrar reposición" : "Registrar devolución"}
       description={
         difference > 0
           ? `Registra un ajuste que ingresa ${formatMoney(money(difference))} a la Caja Mayor (el cobrador repuso el faltante).`
@@ -93,6 +93,33 @@ export function ResolveDifferenceForm({
       loadingText="Registrando…"
       successMessage={(data) =>
         `Diferencia resuelta con un ajuste de ${formatMoney(money(data.amount))}. Caja Mayor: ${formatMoney(money(data.balance))}.`
+      }
+    />
+  );
+}
+
+/** Cierra la diferencia sin mover dinero: el negocio asume la pérdida o el sobrante (02 §5.5). */
+export function AssumeDifferenceForm({
+  settlementId,
+  difference,
+}: {
+  settlementId: string;
+  difference: number;
+}) {
+  const what = difference > 0 ? "el faltante" : "el sobrante";
+  return (
+    <CommandForm<{ amount: number; kind: "FALTANTE" | "SOBRANTE" }>
+      title="Asumir la diferencia"
+      url={`/api/negocio/liquidaciones/${settlementId}/asumir`}
+      idempotent
+      variant="secondary"
+      openLabel="Asumir diferencia"
+      description={`El negocio asume ${what} de ${formatMoney(money(Math.abs(difference)))}: la diferencia queda cerrada y la Caja Mayor no cambia (ya refleja lo realmente entregado). No se puede deshacer ni resolver de nuevo.`}
+      fields={[{ kind: "textarea", name: "note", label: "Motivo", required: true }]}
+      submitLabel="Asumir sin mover dinero"
+      loadingText="Registrando…"
+      successMessage={(data) =>
+        `Diferencia de ${formatMoney(money(data.amount))} asumida por el negocio. La Caja Mayor no cambió.`
       }
     />
   );

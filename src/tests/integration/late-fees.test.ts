@@ -28,6 +28,8 @@ afterAll(async () => {
 
 const key = () => randomUUID() as IdempotencyKey;
 const now = () => new Date("2026-10-13T17:00:00Z");
+/** Con las tres cuotas ya vencidas (14–16 de octubre): la mora es por atraso (02 §3.4). */
+const afterDue = () => new Date("2026-10-20T17:00:00Z");
 
 type Setup = Awaited<ReturnType<typeof setup>>;
 
@@ -69,13 +71,18 @@ const fee = (
   amount = 20_000,
   extra: Partial<{ installmentId: string; reason: string; idempotencyKey: IdempotencyKey }> = {},
 ) =>
-  createLateFee(deps, s.admin, {
-    idempotencyKey: extra.idempotencyKey ?? key(),
-    loanId: s.loanId,
-    installmentId: extra.installmentId,
-    amount,
-    reason: extra.reason ?? "Cuota atrasada",
-  });
+  createLateFee(
+    deps,
+    s.admin,
+    {
+      idempotencyKey: extra.idempotencyKey ?? key(),
+      loanId: s.loanId,
+      installmentId: extra.installmentId,
+      amount,
+      reason: extra.reason ?? "Cuota atrasada",
+    },
+    afterDue,
+  );
 
 const pay = (s: Setup, amount: number, lateFeeChargeId?: string) =>
   registerPayment(deps, s.admin, {
@@ -446,5 +453,136 @@ describe("barreras adicionales de los cargos de mora", () => {
     });
 
     expect(await failureOf(fee(s, 1_000))).toMatchObject({ code: "LOAN_NOT_ACTIVE" });
+  });
+});
+
+describe("la mora es por atraso (decisión del 2026-10-24)", () => {
+  it("rechaza un cargo sobre una cuota que todavía no vence, aunque otra sí haya vencido", async () => {
+    const s = await setup();
+    // 15/10 en Bogotá: la cuota 1 (14/10) está vencida; la 2 vence hoy y aún no lo está.
+    const onDueDay = () => new Date("2026-10-15T17:00:00Z");
+    const create = (installmentId: string) =>
+      createLateFee(
+        deps,
+        s.admin,
+        { idempotencyKey: key(), loanId: s.loanId, installmentId, amount: 5_000, reason: "x" },
+        onDueDay,
+      );
+
+    expect(await failureOf(create(s.installments[1]!))).toMatchObject({
+      code: "INSTALLMENT_NOT_OVERDUE",
+      status: 409,
+    });
+    expect((await create(s.installments[0]!)).result.installmentNumber).toBe(1);
+  });
+
+  it("decide con la fecha local del negocio, no con la UTC", async () => {
+    const s = await setup();
+    // 15/10 00:30 UTC es todavía el 14/10 en Bogotá: la cuota 1 vence ese día y aún no está vencida.
+    const lateUtc = () => new Date("2026-10-15T00:30:00Z");
+
+    expect(
+      await failureOf(
+        createLateFee(
+          deps,
+          s.admin,
+          {
+            idempotencyKey: key(),
+            loanId: s.loanId,
+            installmentId: s.installments[0]!,
+            amount: 5_000,
+            reason: "x",
+          },
+          lateUtc,
+        ),
+      ),
+    ).toMatchObject({ code: "INSTALLMENT_NOT_OVERDUE" });
+  });
+
+  it("rechaza un cargo sobre el préstamo si ninguna cuota ha vencido, sin crear nada", async () => {
+    const s = await setup();
+
+    expect(
+      await failureOf(
+        createLateFee(
+          deps,
+          s.admin,
+          { idempotencyKey: key(), loanId: s.loanId, amount: 5_000, reason: "x" },
+          now,
+        ),
+      ),
+    ).toMatchObject({ code: "LOAN_NOT_OVERDUE", status: 409 });
+    expect((await detail(s))!.lateFees).toEqual([]);
+    const created = await pool.query(
+      "select 1 from public.audit_events where business_id = $1 and action = 'CargoMoraCreado'",
+      [s.businessId],
+    );
+    expect(created.rowCount).toBe(0);
+  });
+});
+
+describe("recierre de un préstamo reactivado por un cargo de mora", () => {
+  const paidEvents = async (s: Setup) =>
+    (
+      await pool.query<{ summary: { voidedChargeId?: string; paymentId?: string } }>(
+        "select summary from public.audit_events where business_id = $1 and action = 'PrestamoPagado' order by occurred_at",
+        [s.businessId],
+      )
+    ).rows.map((row) => row.summary);
+
+  it("anular el último cargo de un préstamo sin cuotas pendientes lo deja PAGADO y audita PrestamoPagado", async () => {
+    const s = await setup();
+    const first = await pay(s, 300_000);
+    expect(first.result.loanPaid).toBe(true);
+    // Mora descubierta después del último pago: el préstamo vuelve a ACTIVO.
+    const charge = await fee(s, 20_000, { installmentId: s.installments[2]! });
+    expect((await detail(s, afterDue()))!.status).toBe("ACTIVO");
+
+    const voided = await voidLateFee(deps, s.admin, {
+      idempotencyKey: key(),
+      chargeId: charge.result.chargeId,
+      reason: "Se cobró por error",
+    });
+
+    expect(voided.result.loanPaid).toBe(true);
+    expect((await detail(s, afterDue()))!.status).toBe("PAGADO");
+    const events = await paidEvents(s);
+    expect(events).toHaveLength(2);
+    expect(events[0]!.paymentId).toBe(first.result.paymentId);
+    expect(events[1]!.voidedChargeId).toBe(charge.result.chargeId);
+  });
+
+  it("pagar el cargo que lo reactivó también lo recierra con PrestamoPagado", async () => {
+    const s = await setup();
+    await pay(s, 300_000);
+    const charge = await fee(s, 20_000);
+
+    const last = await pay(s, 20_000, charge.result.chargeId);
+
+    expect(last.result.loanPaid).toBe(true);
+    expect((await detail(s, afterDue()))!.status).toBe("PAGADO");
+    expect(await paidEvents(s)).toHaveLength(2);
+  });
+
+  it("anular un cargo con cuotas o cargos aún pendientes no emite PrestamoPagado", async () => {
+    const s = await setup();
+    const one = await fee(s, 20_000);
+    const two = await fee(s, 5_000);
+    await pay(s, 300_000);
+
+    const voided = await voidLateFee(deps, s.admin, {
+      idempotencyKey: key(),
+      chargeId: one.result.chargeId,
+      reason: "x",
+    });
+    expect(voided.result.loanPaid).toBe(false);
+    expect(await paidEvents(s)).toHaveLength(0);
+
+    await voidLateFee(deps, s.admin, {
+      idempotencyKey: key(),
+      chargeId: two.result.chargeId,
+      reason: "x",
+    });
+    expect(await paidEvents(s)).toHaveLength(1);
   });
 });

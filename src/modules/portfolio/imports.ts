@@ -1,4 +1,4 @@
-import { runCashCommand, type CashCommandOutcome } from "@/modules/cash/run-cash-command";
+import { runBusinessCommand, type CashCommandOutcome } from "@/modules/cash/run-cash-command";
 import { authorizeBusinessAdmin } from "@/modules/identity/authorize-business-admin";
 import type { SessionContext } from "@/modules/identity/session";
 import type { Tx } from "@/shared/database/with-transaction";
@@ -6,14 +6,20 @@ import { localDateIn, type IsoDate } from "@/shared/dates/dates";
 import { AppError } from "@/shared/errors/app-error";
 import type { IdempotencyKey } from "@/shared/ids/idempotency-key";
 import type { ContractDeps } from "./contracts";
-import { calculateImportedLoan, type ImportedLoanPlan } from "./loan-calculation";
+import {
+  assertMismatchAcknowledged,
+  calculateImportedLoan,
+  historicalDifference,
+  type ImportedLoanPlan,
+} from "./loan-calculation";
 import type { ImportLoanInput, ImportLoanTermsInput } from "./loan-validation";
 
 /**
  * Importación de cartera previa (02 §6.1, ADR 0007): un contrato con `origen = IMPORTADO` y su préstamo,
  * cargados uno a uno con los datos históricos. **No crea pagos, desembolsos ni movimientos en ninguna
  * caja**; lo ya pagado queda como dato de referencia y el calendario guarda solo las cuotas que faltan.
- * Sigue siendo un comando con idempotencia y auditoría, pero no toca la Caja Mayor.
+ * Sigue siendo un comando con idempotencia y auditoría, pero no toca la Caja Mayor: por eso tampoco la
+ * bloquea (`runBusinessCommand`), y una importación no espera a los pagos o gastos del negocio.
  */
 
 export type ImportPreview = {
@@ -28,8 +34,8 @@ export type ImportPreview = {
   /** Cuotas cuyo vencimiento ya pasó (mora anterior): se mostrarán vencidas. */
   overdueInstallments: number;
   /**
-   * total pactado − pagado histórico − saldo pendiente. Es solo informativo: si no es cero, los datos
-   * históricos no cuadran entre sí (p. ej. hubo abonos de interés o descuentos) y el admin decide.
+   * total pactado − pagado histórico − saldo pendiente. Si no es cero, los datos históricos no cuadran
+   * entre sí (p. ej. hubo abonos de interés o descuentos): importar exige confirmarlo con una observación.
    */
   difference: number | null;
 };
@@ -51,7 +57,10 @@ async function assertClientInBusiness(db: Pick<Tx, "query">, businessId: string,
     throw new AppError("CLIENT_NOT_FOUND", "El cliente no existe", 404);
 }
 
-function planFor(input: ImportLoanTermsInput, today: IsoDate): ImportedLoanPlan {
+function planFor(
+  input: ImportLoanTermsInput & Pick<ImportLoanInput, "installmentAmounts">,
+  today: IsoDate,
+): ImportedLoanPlan {
   if (input.originalDate > today) {
     throw new AppError(
       "IMPORT_DATE_IN_FUTURE",
@@ -73,6 +82,7 @@ function planFor(input: ImportLoanTermsInput, today: IsoDate): ImportedLoanPlan 
     installmentCount: input.installmentCount,
     firstDueOn: input.nextDueOn,
     pendingBalance: input.pendingBalance,
+    installmentAmounts: input.installmentAmounts,
   });
 }
 
@@ -99,10 +109,7 @@ export async function previewImportedLoan(
     historicalPaid: input.historicalPaid ?? null,
     overdueInstallments: plan.installments.filter((installment) => installment.dueOn < today)
       .length,
-    difference:
-      input.historicalPaid === undefined
-        ? null
-        : plan.total - input.historicalPaid - plan.scheduled,
+    difference: historicalDifference(plan, input.historicalPaid),
   };
 }
 
@@ -122,7 +129,7 @@ export function importLoan(
   now: () => Date = () => new Date(),
 ): Promise<CashCommandOutcome<ImportedContract>> {
   const { idempotencyKey, ...content } = input;
-  return runCashCommand<ImportedContract>(deps, {
+  return runBusinessCommand<ImportedContract>(deps, {
     name: "ImportarPrestamo",
     actor,
     idempotencyKey,
@@ -130,6 +137,8 @@ export function importLoan(
     execute: async (tx, context) => {
       await assertClientInBusiness(tx, context.businessId, input.clientId);
       const plan = planFor(input, localDateIn(now(), timeZoneOf(actor)));
+      const difference = historicalDifference(plan, input.historicalPaid);
+      const mismatchNote = assertMismatchAcknowledged(difference, input);
 
       const number = (
         await tx.query<{ number: string }>("select private.next_contract_number($1) as number", [
@@ -218,6 +227,9 @@ export function importLoan(
               total: plan.total,
               historicalPaid: input.historicalPaid ?? null,
               pendingBalance: plan.scheduled,
+              // Descuadre histórico confirmado por el Admin (02 §6.1): la diferencia y su observación.
+              historicalDifference: difference,
+              mismatchNote,
               frequency: input.frequency,
               nextDueOn: input.nextDueOn,
             },
@@ -231,6 +243,7 @@ export function importLoan(
               firstDueOn: plan.installments[0]!.dueOn,
               lastDueOn: plan.installments.at(-1)!.dueOn,
               total: plan.scheduled,
+              customAmounts: plan.customAmounts,
             },
           },
         ],

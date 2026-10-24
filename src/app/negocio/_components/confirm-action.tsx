@@ -16,6 +16,8 @@ type Props<T> = {
   loadingText: string;
   variant?: "primary" | "secondary" | "danger";
   successMessage: (data: T) => string;
+  /** Adónde ir tras el éxito cuando lo mostrado deja de existir; sin él, se refresca la página. */
+  redirectTo?: string;
 };
 
 /** Acción sin datos (desactivar, reactivar, cerrar…): un botón, un aviso de lo que pasará y su confirmación. */
@@ -27,6 +29,7 @@ export function ConfirmAction<T>({
   loadingText,
   variant = "secondary",
   successMessage,
+  redirectTo,
 }: Props<T>) {
   const router = useRouter();
   const feedback = useCashFeedback();
@@ -49,7 +52,9 @@ export function ConfirmAction<T>({
   async function confirm() {
     feedback.clear();
     const result = await run({});
-    if (result.status === "success") {
+    if (result.status === "success" && redirectTo) {
+      router.push(redirectTo);
+    } else if (result.status === "success") {
       feedback.announce(successMessage(result.data));
       setOpen(false);
       reset();

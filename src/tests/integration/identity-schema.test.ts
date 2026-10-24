@@ -30,19 +30,19 @@ describe("plans (02 §1.1)", () => {
         code: "ANUAL",
         max_active_collectors: null,
         dashboard_configurable: true,
-        price_amount: "1440000",
+        price_amount: "960000",
       },
       {
         code: "MENSUAL",
         max_active_collectors: null,
         dashboard_configurable: true,
-        price_amount: "150000",
+        price_amount: "100000",
       },
       {
         code: "SEMANAL",
         max_active_collectors: 5,
         dashboard_configurable: false,
-        price_amount: "50000",
+        price_amount: "25000",
       },
     ]);
   });

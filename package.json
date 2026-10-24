@@ -14,6 +14,7 @@
     "lint": "eslint .",
     "check:agent-instructions": "node scripts/check-agent-instructions.mjs",
     "check:module-boundaries": "node scripts/check-module-boundaries.mjs",
+    "check:production-readiness": "node scripts/check-production-readiness.mjs",
     "report:code-hotspots": "node scripts/report-code-hotspots.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
