@@ -238,6 +238,8 @@ Tipos: `INTENTO_FALLIDO`, `VOLVER_A_COBRAR`.
 Motivos de intento fallido: `CLIENTE_AUSENTE`, `LUGAR_CERRADO`, `SIN_DINERO`, `DIRECCION_INCORRECTA`, `OTRO` (exige observación).
 El evento no altera la deuda ni crea una cuota nueva.
 
+**Ley 2300 de 2023 (cobranza)** (decisión del 2026-10-24, a validar con abogado): cumplir los canales autorizados por el deudor, los horarios legales (lunes a viernes de 7:00 a 19:00, sábados de 8:00 a 15:00, sin domingos ni festivos), la periodicidad y la restricción de visitas al domicilio o lugar de trabajo (art. 6) es **responsabilidad del negocio** y así lo declaran los términos y condiciones (`docs/legal/`). En V1 la plataforma no registra autorizaciones ni restringe horarios (ver `09-MEJORAS-POST-V1.md`).
+
 ---
 
 ## 5. Cajas, gastos y liquidaciones

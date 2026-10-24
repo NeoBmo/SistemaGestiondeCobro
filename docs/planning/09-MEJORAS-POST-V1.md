@@ -14,6 +14,14 @@
 | Recuperación punto-en-el-tiempo (PITR) | De pago (requiere Supabase Pro + complemento) | V1 usa backup diario cifrado propio. |
 | Supabase Pro (backups gestionados, sin pausas, soporte) | De pago | Revisar cuando haya ingresos de suscripciones. |
 
+## Cumplimiento legal
+
+| Mejora | Por qué no entra en V1 | Notas |
+| --- | --- | --- |
+| Registrar en la ficha del deudor los canales autorizados y la autorización expresa de visitas (Ley 2300 de 2023, arts. 2 y 6), mostrando solo los canales autorizados | El dueño eligió que en V1 el cumplimiento sea responsabilidad del negocio por términos | Deja evidencia a favor del negocio ante una queja. Prioridad alta tras la revisión del abogado. |
+| Desactivar llamar/WhatsApp fuera del horario legal de cobranza (art. 3), con calendario de festivos | Ídem | — |
+| Bloquear (no solo advertir) préstamos por encima de la tasa de usura | El dueño eligió advertir en V1 | Revaluar según la opinión del abogado. |
+
 ## Operación del cobrador
 
 | Mejora | Por qué no entra en V1 | Notas |

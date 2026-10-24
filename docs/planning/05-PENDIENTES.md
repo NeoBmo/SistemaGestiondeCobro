@@ -6,7 +6,7 @@ La mayoría de las decisiones de V1 ya están cerradas y viven en `02-DOMINIO.md
 
 ## Abierto
 
-- **Redacción legal de términos y condiciones, política de tratamiento de datos personales y conservación.** El dueño confirmó el 2026-10-12 haber cumplido el gate previo a F3; **la política escrita no está en el repositorio**. Decisión del 2026-10-24: se redacta un primer borrador conforme a la ley colombiana (Ley 1581 de 2012 y su reglamentación, Ley 1266 de 2008 por tratarse de datos de deudas) que declara usos lícitos y responsabilidades (incluida la tasa de usura, 02 §2.3); **un abogado debe revisarlo** antes de operar con datos reales (bloquea F8).
+- **Revisión jurídica de los borradores legales** (bloquea F8, antes de cualquier dato real). Borradores v0.1 del 2026-10-24 en `docs/legal/`: términos y condiciones, política de tratamiento de datos personales y una nota con 9 preguntas para el abogado (roles responsable/encargado, transmisión internacional, Ley 2300 y recaudo presencial, suficiencia de la advertencia de usura, Ley 1266, conservación vs. supresión, RNBD, legalidad de la actividad de los clientes e identidad del proveedor). Falta también completar los datos del proveedor (razón social, NIT, contacto) y las regiones de Supabase y Vercel.
 
 ## Abiertos por fase (no bloquean fases anteriores; resolver **antes** de iniciar la fase indicada)
 
