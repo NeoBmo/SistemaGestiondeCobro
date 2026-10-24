@@ -127,7 +127,12 @@ describe("repartos y datos opcionales", () => {
       deps,
       admin,
       {
-        ...terms(clientId, { pendingBalance: 1_000_000, installmentCount: 3 }),
+        // 1.200.000 − 200.000 pagado − 1.000.000 pendiente = 0: los datos cuadran (02 §6.1).
+        ...terms(clientId, {
+          historicalPaid: 200_000,
+          pendingBalance: 1_000_000,
+          installmentCount: 3,
+        }),
         idempotencyKey: key(),
       },
       now,
@@ -171,7 +176,11 @@ describe("repartos y datos opcionales", () => {
     const outcome = await importLoan(
       deps,
       admin,
-      { ...terms(clientId, { historicalPaid: 0 }), idempotencyKey: key() },
+      // Con cero pagado, el saldo pendiente es el total para que los datos cuadren (02 §6.1).
+      {
+        ...terms(clientId, { historicalPaid: 0, pendingBalance: 1_200_000 }),
+        idempotencyKey: key(),
+      },
       now,
     );
     expect((await getLoanDetail(pool, admin, outcome.result.loanId, now()))!.historicalPaid).toBe(
