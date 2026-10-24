@@ -79,7 +79,13 @@ Eventos: `UsuarioCreado`, `PrimerAccesoCompletado`, `InicioSesion`, `UsuarioBloq
 Sin acceso de usuario en V1.
 Datos: negocio, nombre, sobrenombre opcional, identificación, dirección, teléfono, WhatsApp, notas, fechas.
 Reglas: la identificación es **única por negocio** (ADR 0007); datos de contacto editables y auditados; un cliente con historial financiero no se elimina; el cliente **no** almacena un único estado de contrato/saldo/prioridad editable — se calcula desde sus préstamos y cuotas.
-Eventos: `ClienteCreado`, `ClienteActualizado`.
+Decisiones del 2026-10-24 (protección de datos personales, Ley 1581 de 2012):
+- **Unicidad normalizada:** la identificación se guarda tal como se escribió, pero la unicidad compara su forma normalizada (Unicode NFC, sin mayúsculas, solo letras y dígitos): `ABC-1`, `abc 1` y `abc1` son el mismo documento.
+- **Búsqueda** por nombre, sobrenombre o identificación sin distinguir tildes ni mayúsculas (`andres` encuentra `Andrés`).
+- **Supresión:** un cliente sin ningún contrato ni préstamo puede eliminarse (error de captura o derecho de supresión), con evento de auditoría sin datos personales.
+- **Auditoría mínima:** `ClienteActualizado` registra qué campos cambiaron, no sus valores anteriores ni nuevos; los datos vigentes viven solo en el cliente.
+- **Edición concurrente:** gana la última edición (V1 tiene un único Admin por negocio).
+Eventos: `ClienteCreado`, `ClienteActualizado`, `ClienteEliminado`.
 
 ### 2.2 Contrato
 
@@ -94,7 +100,7 @@ Eventos: `ContratoCreado`, `ContratoConfirmado`, `ContratoAnulado`.
 Obligación financiera resultante de un contrato confirmado.
 Datos: contrato, monto principal, interés % (guardado en puntos básicos enteros: 20 % = 2000) y monetario, total a pagar, fecha de desembolso, primera fecha de cobro, frecuencia (`DIARIA`|`SEMANAL`|`MENSUAL`), cantidad de cuotas, saldo pendiente derivado, préstamo anterior opcional (si viene de refinanciación), estado.
 Estados: `ACTIVO` (saldo pendiente) → `PAGADO` (sin saldo en cuotas ni cargos de mora activos) | `REFINANCIADO` (saldo cancelado por préstamo nuevo) | `ANULADO` (anulación válida del contrato).
-Reglas: un contrato confirmado genera un préstamo y su calendario de cuotas; el desembolso de un préstamo nuevo reduce Caja Mayor (no puede confirmarse sin saldo suficiente); un préstamo importado no genera desembolso histórico; un cliente puede tener varios préstamos activos; el total original no se modifica tras confirmar.
+Reglas: un contrato confirmado genera un préstamo y su calendario de cuotas; el desembolso de un préstamo nuevo reduce Caja Mayor (no puede confirmarse sin saldo suficiente); un préstamo importado no genera desembolso histórico; un cliente puede tener varios préstamos activos; el total original no se modifica tras confirmar; la primera fecha de cobro no puede ser anterior al día del desembolso en la zona del negocio (no hay «cuota inicial» en V1); los topes técnicos de interés y número de cuotas (ADR 0007) se exigen también en la base de datos (decisiones del 2026-10-24).
 Eventos: `PrestamoCreado`, `PrestamoDesembolsado`, `PrestamoPagado`, `PrestamoRefinanciado`, `PrestamoAnulado`.
 
 ### 2.4 Cuota
