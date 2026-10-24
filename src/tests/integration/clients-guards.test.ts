@@ -51,30 +51,24 @@ describe("concurrencia", () => {
     expect(await auditCount(businessId, "ClienteCreado")).toBe(1);
   });
 
-  it("dos ediciones simultáneas se serializan: ambas se auditan con el valor anterior correcto", async () => {
+  it("dos ediciones simultáneas se serializan: la segunda ve lo que dejó la primera", async () => {
     const { businessId, admin } = await newBusiness();
     const client = await createClient(deps, admin, { name: "Ana", identification: "1" });
 
-    await Promise.all([
+    // La misma edición dos veces a la vez. Con el bloqueo de fila la segunda lee el teléfono que dejó
+    // la primera y no cambia nada; sin él, ambas leerían el valor viejo y auditarían dos cambios. El
+    // evento ya no lleva valores (02 §2.1, auditoría mínima), así que la prueba se apoya en eso.
+    const results = await Promise.all([
       updateClient(deps, admin, client.id, { name: "Ana", phone: "300" }),
-      updateClient(deps, admin, client.id, { name: "Ana", phone: "310" }),
+      updateClient(deps, admin, client.id, { name: "Ana", phone: "300" }),
     ]);
 
-    const events = await pool.query<{
-      summary: { changes: { phone: { from: string | null; to: string } } };
-    }>(
+    expect(results.map((result) => result.changed).sort()).toEqual([[], ["phone"]]);
+    const events = await pool.query<{ summary: unknown }>(
       "select summary from public.audit_events where business_id = $1 and action = 'ClienteActualizado'",
       [businessId],
     );
-    expect(events.rows).toHaveLength(2);
-    // Encadenadas: el «desde» de una es el «a» de la otra (nadie pisó sin que quedara registro). El orden
-    // de `occurred_at` es el de inicio de la transacción, no el de confirmación: se ordena por la cadena.
-    const changes = events.rows.map((row) => row.summary.changes.phone);
-    const first = changes.find((change) => change.from === null)!;
-    const second = changes.find((change) => change.from !== null)!;
-    expect(first).toBeDefined();
-    expect(second.from).toBe(first.to);
-    expect(new Set([first.to, second.to])).toEqual(new Set(["300", "310"]));
+    expect(events.rows).toEqual([{ summary: { changed: ["phone"] } }]);
   });
 });
 
