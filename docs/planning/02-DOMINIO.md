@@ -149,6 +149,8 @@ Pago $150.000 → completa cuota 1 y cubre cuota 2
 
 No se permite registrar un pago superior al saldo total pendiente. V1 no maneja saldos a favor ni devoluciones.
 
+El orden de aplicación es el número de cuota (que coincide con el orden cronológico). Las cuotas futuras se pueden pagar por anticipado, sin descuento del interés pactado (decisión del 2026-10-24).
+
 ### 3.3 Mora de cuota (cálculo, no entidad)
 
 ```text
@@ -171,7 +173,8 @@ días de mora = máximo(0, fecha de referencia − fecha de vencimiento)
 
 Penalización monetaria **decidida manualmente** por el administrador — nunca automática.
 Datos: negocio, préstamo, cuota opcional, monto original, monto pagado, saldo pendiente, fecha, motivo, admin creador, estado (`ACTIVO`|`PAGADO`|`ANULADO`).
-Reglas: no se crea por fórmula automática; se paga solo con un pago registrado explícitamente contra el cargo; anularlo exige motivo y auditoría y solo es posible si no tiene pagos aplicados vigentes (hay que reversarlos antes); un préstamo no pasa a `PAGADO` con cargos `ACTIVO` con saldo pendiente.
+Reglas: no se crea por fórmula automática; se paga solo con un pago registrado explícitamente contra el cargo; anularlo exige motivo y auditoría y solo es posible si no tiene pagos aplicados vigentes (hay que reversarlos antes); un préstamo no pasa a `PAGADO` con cargos `ACTIVO` con saldo pendiente; un pago de cargo nunca lo deja por debajo de cero ni genera saldo a favor.
+La mora es por atraso (decisión del 2026-10-24): si el cargo indica una cuota, esa cuota debe tener su vencimiento ya pasado; si es sobre el préstamo, este debe tener al menos una cuota con vencimiento pasado. Un cargo sobre un préstamo `PAGADO` lo devuelve a `ACTIVO` (mora descubierta después del último pago); si al pagar o anular ese cargo el préstamo vuelve a quedar sin saldo, pasa a `PAGADO` y se audita `PrestamoPagado`, igual que en el primer cierre.
 Eventos: `CargoMoraCreado`, `CargoMoraPagado`, `CargoMoraAnulado`.
 
 ### 3.5 Refinanciación
@@ -227,7 +230,7 @@ El evento no altera la deuda ni crea una cuota nueva.
 
 Una por negocio. **No se guarda un saldo manual como fuente de verdad** — se deriva de sus movimientos.
 
-Reglas (ADR 0006): el saldo de Caja Mayor **nunca queda negativo** — todo movimiento que lo dejaría por debajo de cero (gasto directo, desembolso, fondo, ajuste negativo o reverso de una entrada) se rechaza; un negocio registra **un solo** `SALDO_APERTURA` (los ingresos posteriores de capital son `INGRESO_CAPITAL`; un error en la apertura se corrige con `AJUSTE`/`REVERSO`).
+Reglas (ADR 0006): el saldo de Caja Mayor **nunca queda negativo** — todo movimiento que lo dejaría por debajo de cero (gasto directo, desembolso, fondo, ajuste negativo o reverso de una entrada) se rechaza; un negocio registra **un solo** `SALDO_APERTURA` (los ingresos posteriores de capital son `INGRESO_CAPITAL`; un error en la apertura se corrige con un `AJUSTE` ± con motivo). Reversar el `SALDO_APERTURA` no libera el cupo: no se registra una segunda apertura (decisión del 2026-10-24).
 
 ### 5.2 Jornada de Caja Menor
 
@@ -246,7 +249,7 @@ Reglas: todo movimiento tiene causa de negocio identificable; no se edita ni eli
 
 Datos: negocio, tipo de caja, jornada opcional, monto, categoría, fecha, observación, usuario creador, movimiento asociado.
 Categorías: `GASOLINA`, `ALIMENTACION`, `REPARACION`, `MEDICINA`, `OTRO` (exige observación).
-Corregir/rechazar un gasto genera un `AJUSTE`; nunca cambia ni borra el gasto original.
+Nunca se cambia ni borra el gasto original (decisión del 2026-10-24): un gasto registrado por error se anula por completo con un `REVERSO` de su movimiento, enlazado al original; una corrección parcial del importe es un `AJUSTE` con motivo. Todo reporte de gastos excluye los gastos cuyo movimiento está reversado.
 
 ### 5.5 Liquidación
 
