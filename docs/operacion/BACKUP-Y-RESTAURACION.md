@@ -71,22 +71,26 @@ Los `.sql` descifrados contienen **datos personales y financieros reales**. Trab
 
 ## Restaurar
 
-Siempre en un proyecto Supabase **distinto** de producción salvo un desastre real. La secuencia es la que documenta Supabase para restaurar un dump de la CLI:
+Siempre en un proyecto Supabase **distinto** de producción salvo un desastre real. La secuencia sigue la que documenta Supabase para restaurar un dump de la CLI, con los roles en un paso aparte:
 
 ```sh
+# 1. Roles. `--role-only` ya excluye los roles reservados de Supabase; va aparte para que un rol que ya
+#    exista en el destino no aborte toda la restauración. Revisa cada ERROR que imprima.
+psql --file backup/roles.sql --dbname "<cadena Session pooler del proyecto destino>"
+
+# 2. Esquema y datos: todo o nada.
 psql \
   --single-transaction \
   --variable ON_ERROR_STOP=1 \
-  --file backup/roles.sql \
   --file backup/schema.sql \
   --command 'SET session_replication_role = replica' \
   --file backup/data.sql \
   --dbname "<cadena Session pooler del proyecto destino>"
 ```
 
-- `--single-transaction` + `ON_ERROR_STOP`: o se restaura todo o nada.
+- `--single-transaction` + `ON_ERROR_STOP`: esquema y datos se restauran enteros o no se restaura nada.
 - `session_replication_role = replica` desactiva los triggers durante la carga de datos. Sin esto, los triggers de solo-agregado, de saldo no negativo y de calendario se ejecutarían sobre filas que ya fueron validadas en origen, y algunos fallarían por el orden de carga.
-- Los errores de «ya existe» en `roles.sql` sobre roles propios de Supabase son esperables en un proyecto nuevo; cualquier otro error detiene la restauración y se investiga.
+- Un `ERROR` en el paso 1 se investiga antes de seguir: en un proyecto nuevo no debería aparecer ninguno.
 
 ## Ensayo de restauración (condición de salida de F8)
 
@@ -97,35 +101,30 @@ Se repite **al menos una vez antes de lanzar** y después **cada trimestre**, o 
 1. Crea un proyecto Supabase **nuevo y separado** (plan gratuito), p. ej. `cuadre-restore-ensayo`. Nunca uses el de producción.
 2. Ejecuta el backup a mano y anota la hora UTC de inicio del job (`T`).
 3. Descarga, descifra y restaura en el proyecto de ensayo como se describe arriba.
-4. Para ver la aplicación sobre la copia, arráncala en local con `.env.local` apuntando al proyecto de ensayo (sus `NEXT_PUBLIC_SUPABASE_*`, `SUPABASE_SERVICE_ROLE_KEY` y `DATABASE_URL`), nunca a producción.
+4. **Configura Auth en el proyecto de ensayo**: la configuración de Auth no viaja en el dump. En *Authentication → Hooks* activa el *Custom Access Token* con `private.custom_access_token_hook`, que añade `app_role` y `business_id` al JWT. Sin él, el login da sesiones sin rol ni negocio y el ensayo fallaría por una causa ajena al backup. Replica también el resto de ajustes de Auth de producción: URL del sitio, URLs de redirección y política de contraseñas.
+5. Para ver la aplicación sobre la copia, arráncala en local con `.env.local` apuntando al proyecto de ensayo (sus `NEXT_PUBLIC_SUPABASE_*`, `SUPABASE_SERVICE_ROLE_KEY` y `DATABASE_URL`), nunca a producción.
 
 ### Checklist de consistencia
 
 Marca cada punto y guarda el resultado.
 
-- [ ] **Restauración sin errores**: `psql` terminó sin `ERROR` (salvo los roles ya existentes descritos arriba).
+- [ ] **Restauración sin errores**: los dos pasos de `psql` terminaron sin `ERROR`.
 - [ ] **Conteos por tabla**: los conteos de la copia coinciden con los de producción para filas creadas hasta `T`. En la copia:
 
   ```sql
-  select 'businesses' as tabla, count(*) from public.businesses
-  union all select 'profiles', count(*) from public.profiles
-  union all select 'subscriptions', count(*) from public.subscriptions
-  union all select 'clients', count(*) from public.clients
-  union all select 'contracts', count(*) from public.contracts
-  union all select 'loans', count(*) from public.loans
-  union all select 'installments', count(*) from public.installments
-  union all select 'payments', count(*) from public.payments
-  union all select 'payment_applications', count(*) from public.payment_applications
-  union all select 'cash_movements', count(*) from public.cash_movements
-  union all select 'cash_sessions', count(*) from public.cash_sessions
-  union all select 'settlements', count(*) from public.settlements
-  union all select 'expenses', count(*) from public.expenses
-  union all select 'audit_events', count(*) from public.audit_events
-  union all select 'auth.users', count(*) from auth.users
+  -- Todas las tablas de public, presentes y futuras, más los usuarios de Auth.
+  select table_name::text as tabla,
+         (xpath('/row/c/text()',
+                query_to_xml(format('select count(*) as c from public.%I', table_name),
+                             false, true, '')))[1]::text::bigint as filas
+    from information_schema.tables
+   where table_schema = 'public' and table_type = 'BASE TABLE'
+  union all
+  select 'auth.users', count(*) from auth.users
   order by 1;
   ```
 
-  En producción, la misma consulta para las tablas con `created_at` añadiendo `where created_at <= '<T>'`. Las tablas sin `created_at` se comparan sin filtro, sabiendo que pudieron cambiar después de `T`.
+  Ejecuta la misma consulta en producción justo antes de lanzar el backup del ensayo, fuera de la jornada de cobro para que no haya escrituras en curso. Si hubo actividad después de `T`, compara las tablas con `created_at` con `select count(*) from public.<tabla> where created_at <= '<T>'`.
 
 - [ ] **Saldo de Caja Mayor = suma de movimientos**, por negocio. Un movimiento sin `session_id` es de la Caja Mayor:
 

@@ -17,6 +17,12 @@ concurrency:
 permissions:
   contents: read
 
+# `shell: bash` explícito añade `-o pipefail`: sin él, un `tar` que falle a mitad dejaría a `age`
+# cifrando un flujo truncado y el job terminaría en verde con un backup corrupto.
+defaults:
+  run:
+    shell: bash
+
 # Las acciones se fijan por SHA de commit (el tag va en el comentario).
 jobs:
   backup:
@@ -42,7 +48,13 @@ jobs:
           # Defensa extra: GitHub enmascara el secreto completo, no la contraseña suelta si una
           # herramienta la imprimiera por separado.
           password="$(printf '%s' "$SUPABASE_DB_URL" | sed -nE 's#^[^:]+://[^:@/]+:([^@]+)@.*#\1#p')"
-          if [ -n "$password" ]; then echo "::add-mask::$password"; fi
+          if [ -n "$password" ]; then
+            echo "::add-mask::$password"
+            # También la forma decodificada (%40 → @). `hex` en variable: el `\` literal en el reemplazo
+            # de `${//}` cambia de sentido entre versiones de bash.
+            hex='\x'
+            echo "::add-mask::$(printf '%b' "${password//%/"$hex"}")"
+          fi
           # `runner.temp` no está disponible en el `env` del job: se publica aquí para los pasos siguientes.
           echo "DUMP_DIR=$RUNNER_TEMP/backup-plain" >> "$GITHUB_ENV"
           echo "OUT_DIR=$RUNNER_TEMP/backup-encrypted" >> "$GITHUB_ENV"
