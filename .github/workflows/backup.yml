@@ -1,0 +1,108 @@
+name: Backup diario cifrado
+
+# 03-ARQUITECTURA §7: Supabase Free no tiene backups recuperables. Este job exporta la base de
+# producción, la cifra con la clave PÚBLICA age del dueño y sube solo el archivo cifrado.
+# El repositorio es público: el dump en claro nunca sale del runner ni se imprime en el log.
+# Procedimiento completo (claves, descarga, descifrado, ensayo): docs/operacion/BACKUP-Y-RESTAURACION.md
+
+on:
+  schedule:
+    - cron: "17 8 * * *" # 03:17 en Bogotá (UTC-5), fuera de la jornada de cobro
+  workflow_dispatch:
+
+concurrency:
+  group: backup
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+# Las acciones se fijan por SHA de commit (el tag va en el comentario).
+jobs:
+  backup:
+    name: Exportar, cifrar y guardar (30 días)
+    # En un fork no hay secretos ni sentido en ejecutarlo.
+    if: ${{ github.repository == 'NeoBmo/SistemaGestiondeCobro' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Comprobar configuración
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          BACKUP_AGE_RECIPIENT: ${{ vars.BACKUP_AGE_RECIPIENT }}
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then
+            echo "::error::Falta el secreto SUPABASE_DB_URL (cadena del Session pooler de producción). Ver docs/operacion/BACKUP-Y-RESTAURACION.md"
+            exit 1
+          fi
+          if [[ ! "$BACKUP_AGE_RECIPIENT" =~ ^age1[0-9a-z]{58}$ ]]; then
+            echo "::error::Falta la variable BACKUP_AGE_RECIPIENT o no es una clave pública age (age1…). Ver docs/operacion/BACKUP-Y-RESTAURACION.md"
+            exit 1
+          fi
+          # Defensa extra: GitHub enmascara el secreto completo, no la contraseña suelta si una
+          # herramienta la imprimiera por separado.
+          password="$(printf '%s' "$SUPABASE_DB_URL" | sed -nE 's#^[^:]+://[^:@/]+:([^@]+)@.*#\1#p')"
+          if [ -n "$password" ]; then echo "::add-mask::$password"; fi
+          # `runner.temp` no está disponible en el `env` del job: se publica aquí para los pasos siguientes.
+          echo "DUMP_DIR=$RUNNER_TEMP/backup-plain" >> "$GITHUB_ENV"
+          echo "OUT_DIR=$RUNNER_TEMP/backup-encrypted" >> "$GITHUB_ENV"
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      # Fija la versión de la CLI de Supabase a la de package-lock.json.
+      - run: npm ci
+
+      - name: Instalar age
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq age
+          age --version
+
+      - name: Exportar roles, esquema y datos
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          umask 077
+          mkdir -p "$DUMP_DIR"
+          npx --no-install supabase db dump --db-url "$SUPABASE_DB_URL" --role-only -f "$DUMP_DIR/roles.sql"
+          npx --no-install supabase db dump --db-url "$SUPABASE_DB_URL" -f "$DUMP_DIR/schema.sql"
+          npx --no-install supabase db dump --db-url "$SUPABASE_DB_URL" --data-only --use-copy -f "$DUMP_DIR/data.sql"
+          for file in roles.sql schema.sql data.sql; do
+            if [ ! -s "$DUMP_DIR/$file" ]; then
+              echo "::error::$file salió vacío: el backup no es válido."
+              exit 1
+            fi
+          done
+          # Solo tamaños, nunca contenido.
+          wc -c "$DUMP_DIR"/*.sql
+
+      - name: Empaquetar y cifrar
+        env:
+          BACKUP_AGE_RECIPIENT: ${{ vars.BACKUP_AGE_RECIPIENT }}
+        run: |
+          umask 077
+          mkdir -p "$OUT_DIR"
+          name="cuadre-backup-$(date -u +%Y-%m-%dT%H%MZ).tar.gz.age"
+          # El tar viaja por la tubería directo a age: no queda un .tar.gz en claro en disco.
+          tar -C "$DUMP_DIR" -czf - roles.sql schema.sql data.sql \
+            | age --encrypt --recipient "$BACKUP_AGE_RECIPIENT" --output "$OUT_DIR/$name"
+          test -s "$OUT_DIR/$name"
+          ls -l "$OUT_DIR"
+
+      - name: Borrar el dump en claro
+        if: ${{ always() }}
+        run: rm -rf "$DUMP_DIR"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: backup-${{ github.run_id }}
+          # Solo el directorio cifrado; DUMP_DIR ya no existe.
+          path: ${{ runner.temp }}/backup-encrypted/
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
