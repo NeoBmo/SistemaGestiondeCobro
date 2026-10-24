@@ -103,7 +103,11 @@ describe("signInWithUsername", () => {
       signInWithUsername(deps(), { username: account.username, password: "Incorrecta123" }),
     );
     const unknownUser = await failureOf(
-      signInWithUsername(deps(), { username: "no.existe.jamas", password: "Incorrecta123" }),
+      // Único por ejecución: el límite de intentos (02 §1.4) bloquearía un nombre fijo tras 5 corridas.
+      signInWithUsername(deps(), {
+        username: `no.existe.${crypto.randomUUID().slice(0, 8)}`,
+        password: "Incorrecta123",
+      }),
     );
 
     for (const error of [wrongPassword, unknownUser]) {
@@ -120,7 +124,9 @@ describe("signInWithUsername", () => {
       },
     } as unknown as LoginDeps["supabase"];
 
-    for (const username of ["no válido", "", "ab"]) {
+    // Únicos por ejecución (salvo el vacío): el límite de intentos cuenta también estos fallos.
+    const suffix = crypto.randomUUID().slice(0, 4);
+    for (const username of [`no válido ${suffix}`, "", suffix.slice(0, 2)]) {
       expect(
         (await failureOf(signInWithUsername(deps(supabase), { username, password: "Clave12345" })))
           .code,
