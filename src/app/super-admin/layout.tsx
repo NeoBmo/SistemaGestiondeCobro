@@ -13,6 +13,7 @@ const LINKS = [
   ["/super-admin", "Negocios"],
   ["/super-admin/soporte", "Soporte"],
   ["/super-admin/monitoreo", "Monitoreo"],
+  ["/super-admin/usura", "Tasa de usura"],
 ] as const;
 
 export default async function SuperAdminLayout({
