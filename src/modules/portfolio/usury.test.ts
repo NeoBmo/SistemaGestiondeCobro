@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
+import type { Tx } from "@/shared/database/with-transaction";
 import { isoDate } from "@/shared/dates/dates";
+import { money } from "@/shared/money/money";
+import type { LoanPlan } from "./loan-calculation";
 import {
   assertUsuryAcknowledged,
+  assessUsury,
   usuryAuditSummary,
   usuryRateSchema,
   type UsuryAssessment,
@@ -88,5 +92,33 @@ describe("usuryAuditSummary", () => {
       usuryRateBps: null,
       confirmedWithUsuryWarning: false,
     });
+  });
+});
+
+describe("assessUsury", () => {
+  // Una base falsa que siempre devuelve la usura de 28,59 % E.A.
+  const db = {
+    query: async () => ({
+      rows: [{ id: "r-1", rate_bps: 2859, valid_from: "2026-01-01", source: "Resolución" }],
+    }),
+  } as unknown as Pick<Tx, "query">;
+  /** $1.000.000 que se devuelven en una sola cuota a 365 días: la TEA es (cuota − principal) / principal. */
+  const oneYear = (amount: number): LoanPlan => ({
+    principal: money(1_000_000),
+    interest: money(amount - 1_000_000),
+    total: money(amount),
+    installments: [{ number: 1, dueOn: isoDate("2027-01-01"), amount: money(amount) }],
+  });
+
+  it("advierte un exceso menor que medio punto básico aunque la TEA redondeada iguale la usura", async () => {
+    // 28,594 % E.A. (calculado a mano: 285.940 / 1.000.000) se muestra como 28,59 %, pero supera 28,59 %.
+    const assessment = await assessUsury(db, oneYear(1_285_940), isoDate("2026-01-01"));
+    expect(assessment).toMatchObject({ effectiveAnnualRateBps: 2859, exceeds: true });
+  });
+
+  it("por debajo de la usura no advierte", async () => {
+    // 28,58 % E.A.
+    const assessment = await assessUsury(db, oneYear(1_285_800), isoDate("2026-01-01"));
+    expect(assessment).toMatchObject({ effectiveAnnualRateBps: 2858, exceeds: false });
   });
 });

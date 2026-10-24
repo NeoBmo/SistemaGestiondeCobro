@@ -13,8 +13,10 @@ import { daysBetween, type IsoDate } from "@/shared/dates/dates";
  * mes de 28 o de 31 días pesa lo que dura de verdad. Como todas las cuotas son positivas, VP decrece con `d`
  * y la raíz es única: se encuentra por bisección con un número fijo de pasos (sin tolerancias que ajustar).
  *
- * Los importes son enteros (`Money`); los flotantes solo aparecen en la tasa. El resultado se redondea
- * half-up a puntos básicos enteros, la misma unidad en que se registra la usura.
+ * Los importes son enteros (`Money`); los flotantes solo aparecen en la tasa. Para **mostrar y auditar** la
+ * TEA se redondea half-up a puntos básicos enteros (la unidad en que se registra la usura); para **decidir si
+ * se advierte** se usa el valor sin redondear (`effectiveAnnualRateExactBps`): con redondeo, una TEA de
+ * 28,594 % frente a una usura de 28,59 % quedaría en 2859 = 2859 y el exceso real no se advertiría.
  */
 
 /**
@@ -64,7 +66,8 @@ function assertFlows(flows: RateFlows): { days: number; amount: number }[] {
   return points;
 }
 
-export function effectiveAnnualRate(flows: RateFlows): EffectiveAnnualRate {
+/** TEA en puntos básicos **sin redondear** (flotante), acotada al tope. */
+export function effectiveAnnualRateExactBps(flows: RateFlows): number {
   const points = assertFlows(flows);
   const presentValue = (daily: number) =>
     points.reduce((sum, { days, amount }) => sum + amount / Math.pow(1 + daily, days), 0) -
@@ -72,9 +75,7 @@ export function effectiveAnnualRate(flows: RateFlows): EffectiveAnnualRate {
 
   // VP(0) = total − principal ≥ 0. Si sigue positivo en el tope (p. ej. interés cobrado el mismo día del
   // desembolso), la tasa es al menos el tope.
-  if (presentValue(MAX_DAILY_RATE) > 0) {
-    return { bps: MAX_EFFECTIVE_ANNUAL_RATE_BPS, capped: true };
-  }
+  if (presentValue(MAX_DAILY_RATE) > 0) return MAX_EFFECTIVE_ANNUAL_RATE_BPS;
   let low = 0;
   let high = MAX_DAILY_RATE;
   // 200 mitades llevan el intervalo por debajo de la precisión del flotante: el resultado ya no cambia.
@@ -84,8 +85,17 @@ export function effectiveAnnualRate(flows: RateFlows): EffectiveAnnualRate {
     else high = middle;
   }
   const annual = Math.expm1(DAYS_PER_YEAR * Math.log1p((low + high) / 2));
-  const bps = Math.min(Math.floor(annual * 10_000 + 0.5), MAX_EFFECTIVE_ANNUAL_RATE_BPS);
+  return Math.min(annual * 10_000, MAX_EFFECTIVE_ANNUAL_RATE_BPS);
+}
+
+/** La TEA exacta redondeada half-up a puntos básicos enteros. */
+export function roundRateBps(exactBps: number): EffectiveAnnualRate {
+  const bps = Math.min(Math.floor(exactBps + 0.5), MAX_EFFECTIVE_ANNUAL_RATE_BPS);
   return { bps, capped: bps === MAX_EFFECTIVE_ANNUAL_RATE_BPS };
+}
+
+export function effectiveAnnualRate(flows: RateFlows): EffectiveAnnualRate {
+  return roundRateBps(effectiveAnnualRateExactBps(flows));
 }
 
 /** `2859` → `28,59 %`; `368810110` → `3.688.101,10 %`. Aritmética entera, sin `Intl`. */

@@ -6,7 +6,7 @@ import { withTransaction, type Tx } from "@/shared/database/with-transaction";
 import { formatIsoDate, isoDate, type IsoDate } from "@/shared/dates/dates";
 import { AppError } from "@/shared/errors/app-error";
 import { interestBpsFromPercent } from "@/shared/money/money";
-import { effectiveAnnualRate, formatRateBps } from "./effective-annual-rate";
+import { effectiveAnnualRateExactBps, formatRateBps, roundRateBps } from "./effective-annual-rate";
 import type { LoanPlan } from "./loan-calculation";
 
 /**
@@ -129,7 +129,7 @@ export type UsuryAssessment = {
   effectiveAnnualRateCapped: boolean;
   /** Usura vigente el día del desembolso; `null` si no hay ninguna registrada (no se puede comparar). */
   usuryRate: UsuryRate | null;
-  /** TEA > usura vigente: hay que advertir y la confirmación exige marcarlo. */
+  /** TEA exacta (sin redondear) > usura vigente: hay que advertir y la confirmación exige marcarlo. */
   exceeds: boolean;
 };
 
@@ -139,17 +139,19 @@ export async function assessUsury(
   plan: LoanPlan,
   disbursedOn: IsoDate,
 ): Promise<UsuryAssessment> {
-  const rate = effectiveAnnualRate({
+  const exactBps = effectiveAnnualRateExactBps({
     principal: plan.principal,
     disbursedOn,
     installments: plan.installments,
   });
+  const rate = roundRateBps(exactBps);
   const usuryRate = await currentUsuryRate(db, disbursedOn);
   return {
     effectiveAnnualRateBps: rate.bps,
     effectiveAnnualRateCapped: rate.capped,
     usuryRate,
-    exceeds: usuryRate !== null && rate.bps > usuryRate.rateBps,
+    // Sin redondear: un exceso menor que medio punto básico también se advierte.
+    exceeds: usuryRate !== null && exactBps > usuryRate.rateBps,
   };
 }
 
