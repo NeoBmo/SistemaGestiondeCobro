@@ -180,6 +180,10 @@ function ActionForm<T>({
   const { state, run, reset } = useCommand<T>(url);
   const [armed, setArmed] = useState(false);
   const errorRef = useRef<HTMLDivElement>(null);
+  // Cerrojo síncrono: el botón deshabilitado depende de un re-render, y un doble envío muy rápido (doble
+  // clic, Enter repetido) podría llegar antes. Restablecer no tiene clave de idempotencia: repetirlo emite
+  // otra contraseña temporal.
+  const inFlight = useRef(false);
   const busy = state.status === "loading";
 
   const planOptions = PLAN_CATALOG.filter((plan) => plan.code !== excludePlan).map((plan) => ({
@@ -194,6 +198,7 @@ function ActionForm<T>({
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (inFlight.current) return;
     if (confirmText && !armed) {
       setArmed(true);
       return;
@@ -209,7 +214,13 @@ function ActionForm<T>({
           : fields === "note"
             ? { note }
             : {};
-    const result = await run(body);
+    inFlight.current = true;
+    let result: Awaited<ReturnType<typeof run>>;
+    try {
+      result = await run(body);
+    } finally {
+      inFlight.current = false;
+    }
     setArmed(false);
     if (result.status === "success") {
       formElement.reset();
