@@ -70,7 +70,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash .claude/hooks/block-commit-on-main.sh"
+            "command": "node .claude/hooks/block-commit-on-main.mjs",
+            "if": "Bash(*git*commit*)",
+            "timeout": 15
           }
         ]
       }
