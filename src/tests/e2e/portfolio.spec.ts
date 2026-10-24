@@ -130,6 +130,8 @@ test("el Admin calcula, confirma un préstamo y ve su calendario; la caja baja u
   await expect(page.getByRole("heading", { name: "Vista previa" })).toBeVisible();
   await expect(page.getByText("$1.200.000")).toBeVisible();
   await expect(page.getByText(/12 de/)).toContainText("$100.000");
+  // Sin tasa de usura registrada la vista previa lo indica y no bloquea (02 §2.3).
+  await expect(page.getByTestId("usura")).toContainText("Sin tasa de usura registrada");
 
   // Cambiar una condición descarta la vista previa: no se confirma algo que no se calculó.
   await page.getByLabel(/^Número de cuotas/).fill("6");
@@ -218,4 +220,77 @@ test("el Admin importa un préstamo anterior: sin pagos ni cambios en la caja, c
   await page.goto("/negocio/caja");
   await expect(page.getByTestId("saldo")).toHaveText("$0");
   await expect(page.getByText("Aún no hay movimientos.")).toBeVisible();
+});
+
+test("el Super Admin registra la usura y un préstamo que la supera solo se confirma marcando la advertencia", async ({
+  page,
+}) => {
+  // La usura es de plataforma: esta prueba borra su tasa al terminar para no alcanzar a las demás.
+  const source = `Resolución E2E ${randomUUID().slice(0, 8)}`;
+  try {
+    const root = await fixtures.account({ role: "SUPER_ADMIN", businessId: null });
+    await login(page, root.username, root.password);
+    await page.goto("/super-admin/usura");
+    await page.getByRole("button", { name: "Registrar tasa de usura" }).click();
+    await page.getByLabel(/^Tasa efectiva anual/).fill("28,59");
+    // Ayer en UTC: nunca es posterior a «hoy» en Bogotá (UTC−5), el día del desembolso.
+    const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+    await page.getByLabel(/^Rige desde/).fill(yesterday);
+    await page.getByLabel(/^Fuente/).fill(source);
+    await page.getByRole("button", { name: "Registrar", exact: true }).click();
+    await expect(page.getByText("Tasa de usura registrada.")).toBeVisible();
+    await expect(page.getByTestId("usura-vigente")).toContainText("28,59 % E.A.");
+    await expect(page.getByTestId("usura-vigente")).toContainText(source);
+
+    const businessId = await fixtures.business("Negocio usura E2E");
+    const admin = await fixtures.account({ role: "ADMIN_NEGOCIO", businessId });
+    await pool.query(
+      `insert into public.cash_movements (business_id, cashbox_id, type, direction, amount, created_by)
+       select $1, id, 'INGRESO_CAPITAL', 'ENTRADA', 2000000, $2 from public.main_cashboxes where business_id = $1`,
+      [businessId, admin.userId],
+    );
+    const client = await pool.query<{ id: string }>(
+      "insert into public.clients (business_id, name, identification, created_by) values ($1, 'Eva Usura', $2, $3) returning id",
+      [businessId, randomUUID().slice(0, 8), admin.userId],
+    );
+    await page.context().clearCookies();
+    await login(page, admin.username, admin.password);
+    await page.goto(`/negocio/prestamos/nuevo?cliente=${client.rows[0]!.id}`);
+    await expect(page.getByRole("heading", { level: 1, name: "Nuevo préstamo" })).toBeVisible();
+
+    // 20 % en 12 cuotas diarias: miles de por ciento efectivo anual, muy por encima de la usura.
+    await page.getByLabel(/^Monto a prestar/).fill("1000000");
+    await page.getByRole("button", { name: "Calcular" }).click();
+    const warning = page.getByTestId("usura");
+    await expect(warning).toContainText("Este préstamo supera la tasa de usura");
+    await expect(warning).toContainText("3.688.101,10 % E.A.");
+    await expect(warning).toContainText("28,59 % E.A.");
+
+    const confirm = page.getByRole("button", { name: "Confirmar préstamo y desembolsar" });
+    await expect(confirm).toBeDisabled();
+    await page.getByLabel(/Conozco la advertencia de usura/).check();
+    await confirm.click();
+    await expect(page.getByRole("heading", { level: 1, name: /Contrato CT-000001/ })).toBeVisible();
+
+    const audit = await pool.query<{ summary: { usury: Record<string, unknown> } }>(
+      `select e.summary from public.audit_events e
+        where e.business_id = $1 and e.action = 'ContratoConfirmado'`,
+      [businessId],
+    );
+    expect(audit.rows[0]?.summary.usury).toMatchObject({
+      usuryRateBps: 2859,
+      confirmedWithUsuryWarning: true,
+    });
+  } finally {
+    const db = await pool.connect();
+    try {
+      await db.query("begin");
+      // Solo agregado: los disparadores se desactivan únicamente en esta limpieza (como en `purge`).
+      await db.query("set local session_replication_role = replica");
+      await db.query("delete from public.usury_rates where source = $1", [source]);
+      await db.query("commit");
+    } finally {
+      db.release();
+    }
+  }
 });
