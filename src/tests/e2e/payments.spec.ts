@@ -29,7 +29,10 @@ async function login(page: Page, username: string, password: string) {
   await response;
 }
 
-/** Préstamo de $300.000 sin interés en 3 cuotas diarias de $100.000, con $2.000.000 en la Caja Mayor. */
+/**
+ * Préstamo de $300.000 sin interés en 3 cuotas diarias de $100.000, con $2.000.000 en la Caja Mayor.
+ * Desembolsado hace dos días: la cuota 1 venció ayer (la mora es por atraso, 02 §3.4), la 2 vence hoy.
+ */
 async function seedLoan() {
   const businessId = await fixtures.business("Negocio pagos E2E");
   const account = await fixtures.account({ role: "ADMIN_NEGOCIO", businessId });
@@ -41,15 +44,21 @@ async function seedLoan() {
     identification: randomUUID().slice(0, 8),
   });
   const today = localDateIn(new Date(), "America/Bogota");
-  const loan = await confirmContract(deps, admin, {
-    clientId: client.id,
-    principal: 300_000,
-    interestBps: 0,
-    frequency: "DIARIA",
-    installmentCount: 3,
-    firstDueOn: isoDate(addDays(today, 1)),
-    idempotencyKey: key(),
-  });
+  const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
+  const loan = await confirmContract(
+    deps,
+    admin,
+    {
+      clientId: client.id,
+      principal: 300_000,
+      interestBps: 0,
+      frequency: "DIARIA",
+      installmentCount: 3,
+      firstDueOn: isoDate(addDays(today, -1)),
+      idempotencyKey: key(),
+    },
+    () => twoDaysAgo,
+  );
   return { account, loanId: loan.result.loanId };
 }
 

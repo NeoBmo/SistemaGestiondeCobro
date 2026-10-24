@@ -8,6 +8,7 @@ const authorizeBusinessAdmin = vi.fn();
 const authorizeCollector = vi.fn();
 const confirmSettlement = vi.fn();
 const resolveDifference = vi.fn();
+const assumeDifference = vi.fn();
 const declareSettlement = vi.fn();
 
 vi.mock("@/modules/identity/require-session", () => ({ requireSession }));
@@ -16,6 +17,7 @@ vi.mock("@/modules/identity/authorize-collector", () => ({ authorizeCollector })
 vi.mock("@/modules/collections/settlements", () => ({
   confirmSettlement,
   resolveDifference,
+  assumeDifference,
   declareSettlement,
 }));
 vi.mock("@/shared/database/pg-pool", () => ({ getPool: () => "pool" }));
@@ -70,6 +72,28 @@ describe("POST /api/negocio/liquidaciones/[settlementId]/[action]", () => {
       { receivedAmount: 100, observation: "ok", settlementId: ID, idempotencyKey: KEY },
     );
     expect((await call(ID, "resolver", { note: "Repuesto" })).status).toBe(200);
+  });
+
+  it("asumir es un comando propio: autoriza como AsumirDiferencia, exige motivo y no repone", async () => {
+    requireSession.mockResolvedValue({ userId: "u" });
+    authorizeBusinessAdmin.mockResolvedValue("b-1");
+    assumeDifference.mockResolvedValue({ result: { amount: 10 }, replayed: false });
+
+    expect((await call(ID, "asumir", { note: " " })).status).toBe(400);
+    expect(assumeDifference).not.toHaveBeenCalled();
+
+    expect((await call(ID, "asumir", { note: " Pérdida del día " })).status).toBe(200);
+    expect(authorizeBusinessAdmin).toHaveBeenLastCalledWith(
+      "pool",
+      { userId: "u" },
+      "AsumirDiferencia",
+    );
+    expect(assumeDifference).toHaveBeenCalledWith(
+      { db: "pool" },
+      { userId: "u" },
+      { note: "Pérdida del día", settlementId: ID, idempotencyKey: KEY },
+    );
+    expect(resolveDifference).not.toHaveBeenCalled();
   });
 });
 

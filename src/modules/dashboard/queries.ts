@@ -34,7 +34,10 @@ export type DashboardData = {
   today: IsoDate;
   range: { from: IsoDate; to: IsoDate };
   cashBalance: Money;
+  /** Solo cuotas: los cargos de mora van aparte, en `lateFees`. */
   portfolio: { pending: Money; overdue: Money; clientsInArrears: number; activeLoans: number };
+  /** Cargos de mora `ACTIVO` con saldo (no anulados) de préstamos activos: su saldo y cuántos son. */
+  lateFees: { pending: Money; charges: number };
   collected: Money;
   spent: Money;
   sessions: { pending: number; unresolvedDifferences: number; unresolvedAmount: Money };
@@ -94,7 +97,7 @@ export async function getDashboard(
   const config = resolveDashboardConfig(subscription?.plan_code ?? null, saved);
   const range = periodRange(config.period, today);
 
-  const [cash, portfolio, flows, sessions, projection] = await Promise.all([
+  const [cash, portfolio, lateFees, flows, sessions, projection] = await Promise.all([
     db.query<{ balance: string }>(
       `select coalesce(sum(case direction when 'ENTRADA' then amount else -amount end), 0)::text as balance
          from public.cash_movements where business_id = $1 and session_id is null`,
@@ -112,6 +115,25 @@ export async function getDashboard(
          left join applied ap on ap.installment_id = i.id
         where i.business_id = $1 and i.amount - coalesce(ap.amount, 0) > 0`,
       [businessId, today],
+    ),
+    db.query<{ pending: string; charges: string }>(
+      `with charge_applied as (
+         select a.late_fee_charge_id, sum(a.amount) as amount
+           from public.payment_applications a
+           join public.payments p on p.id = a.payment_id
+          where a.business_id = $1 and a.late_fee_charge_id is not null
+            and not exists (select 1 from public.payment_reversals r where r.payment_id = p.id)
+          group by a.late_fee_charge_id
+       )
+       select coalesce(sum(c.amount - coalesce(ap.amount, 0)), 0)::text as pending,
+              count(*)::text as charges
+         from public.late_fee_charges c
+         join public.loans l on l.id = c.loan_id and l.status = 'ACTIVO'
+         left join charge_applied ap on ap.late_fee_charge_id = c.id
+        where c.business_id = $1
+          and not exists (select 1 from public.late_fee_voids v where v.charge_id = c.id)
+          and c.amount - coalesce(ap.amount, 0) > 0`,
+      [businessId],
     ),
     db.query<{ collected: string; spent: string }>(
       `select coalesce(sum(case when m.type = 'COBRO' then m.amount else -m.amount end)
@@ -169,6 +191,10 @@ export async function getDashboard(
       overdue: money(portfolioRow.overdue),
       clientsInArrears: Number(portfolioRow.clients),
       activeLoans: Number(portfolioRow.loans),
+    },
+    lateFees: {
+      pending: money(lateFees.rows[0]!.pending),
+      charges: Number(lateFees.rows[0]!.charges),
     },
     collected: money(flowRow.collected),
     spent: money(flowRow.spent),

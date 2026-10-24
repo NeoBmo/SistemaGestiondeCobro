@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { parseAmountInput } from "@/modules/cash/amount-input";
 import type { ImportPreview, ImportedContract } from "@/modules/portfolio/imports";
 import { LOAN_FREQUENCIES } from "@/modules/portfolio/loan-calculation";
@@ -35,9 +35,11 @@ function parsePercent(text: string): number | null {
 }
 
 /**
- * Importación de un préstamo de cartera previa, en dos pasos y sin tocar ninguna caja: «Calcular» muestra
- * las cuotas que faltan y «Importar» las guarda. Lo ya pagado queda solo como dato de referencia. Cambiar
- * cualquier dato descarta la vista previa.
+ * Importación de un préstamo de cartera previa, en dos pasos y sin tocar ninguna caja: «Calcular» propone
+ * las cuotas que faltan (el saldo en partes iguales), el Admin puede cambiar el monto de cada una e
+ * «Importar» las guarda. Lo ya pagado queda solo como dato de referencia; si no cuadra con el total y el
+ * saldo, importar exige confirmarlo con una observación (02 §6.1). Cambiar cualquier dato del préstamo
+ * descarta la vista previa. Las comprobaciones de aquí son solo ayuda: el servidor las repite.
  */
 export function ImportLoanForm({ clientId, clientName, today }: Props) {
   const router = useRouter();
@@ -46,11 +48,21 @@ export function ImportLoanForm({ clientId, clientName, today }: Props) {
   const [terms, setTerms] = useState<Record<string, unknown> | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [idempotency] = useState(() => createIdempotencyKeyHolder());
+  const [amounts, setAmounts] = useState<string[]>([]);
+  const [mismatch, setMismatch] = useState({ confirmed: false, note: "" });
+  const [confirmErrors, setConfirmErrors] = useState<Record<string, string>>({});
   const errorRef = useRef<HTMLDivElement>(null);
+  const previewRef = useRef<HTMLElement>(null);
+  const confirmErrorId = useId();
   const calculating = preview.state.status === "loading";
   const confirming = confirm.state.status === "loading" || confirm.state.status === "success";
   const busy = calculating || confirming;
   const planned = preview.state.status === "success" && terms ? preview.state.data : null;
+  const unbalanced = planned !== null && planned.difference !== null && planned.difference !== 0;
+  const parsedAmounts = amounts.map((text) => parseAmountInput(text));
+  const amountsSum = parsedAmounts.every((parsed) => parsed.ok)
+    ? parsedAmounts.reduce((sum, parsed) => sum + (parsed.ok ? parsed.amount : 0), 0)
+    : null;
 
   useEffect(() => {
     if (preview.state.status === "error" || confirm.state.status === "error") {
@@ -104,12 +116,55 @@ export function ImportLoanForm({ clientId, clientName, today }: Props) {
       nextDueOn: text("nextDueOn"),
     };
     setTerms({ ...chosen, comment: text("comment") || undefined });
-    await preview.run(chosen);
+    const result = await preview.run(chosen);
+    if (result.status === "success") {
+      setAmounts(result.data.plan.installments.map((installment) => String(installment.amount)));
+      setMismatch({ confirmed: false, note: "" });
+      setConfirmErrors({});
+    }
+  }
+
+  // Corregir montos u observación no renueva la clave: un intento rechazado no la dejó reservada, y uno
+  // que sí se guardó (respuesta perdida) debe responder 409 en vez de importar dos veces.
+  function onEditConfirmation() {
+    if (confirm.state.status === "error") confirm.reset();
   }
 
   async function onConfirm() {
-    if (!terms) return;
-    const result = await confirm.run(terms, {
+    if (!terms || !planned) return;
+    const next: Record<string, string> = {};
+    parsedAmounts.forEach((parsed, index) => {
+      if (!parsed.ok) next[`amount-${index}`] = parsed.message;
+    });
+    if (amountsSum !== null && amountsSum !== planned.plan.scheduled) {
+      next.amounts = `Las cuotas suman ${formatMoney(money(amountsSum))} y deben sumar exactamente el saldo pendiente, ${formatMoney(money(planned.plan.scheduled))}.`;
+    }
+    if (unbalanced && !mismatch.confirmed) {
+      next.confirmMismatch = "Confirma que quieres importar con esta diferencia.";
+    }
+    if (unbalanced && mismatch.note.trim() === "") {
+      next.mismatchNote = "Escribe por qué los datos históricos no cuadran.";
+    }
+    setConfirmErrors(next);
+    const firstError = Object.keys(next)[0];
+    if (firstError !== undefined) {
+      // El foco va al primer campo con error: su mensaje se lee por `aria-describedby` y, en móvil,
+      // queda a la vista aunque la lista de cuotas tenga desplazamiento propio.
+      const field = firstError.startsWith("amount-")
+        ? `installment-${Number(firstError.slice("amount-".length)) + 1}`
+        : firstError === "amounts"
+          ? "installment-1"
+          : firstError;
+      previewRef.current?.querySelector<HTMLElement>(`[name="${field}"]`)?.focus();
+      return;
+    }
+
+    const body = {
+      ...terms,
+      installmentAmounts: parsedAmounts.map((parsed) => (parsed.ok ? parsed.amount : 0)),
+      ...(unbalanced ? { confirmMismatch: true, mismatchNote: mismatch.note.trim() } : {}),
+    };
+    const result = await confirm.run(body, {
       headers: { "Idempotency-Key": idempotency.current() },
     });
     if (result.status === "success") router.push(`/negocio/prestamos/${result.data.loanId}`);
@@ -230,7 +285,11 @@ export function ImportLoanForm({ clientId, clientName, today }: Props) {
       ) : null}
 
       {planned ? (
-        <section aria-labelledby="vista-previa" className="border-border rounded-lg border p-4">
+        <section
+          ref={previewRef}
+          aria-labelledby="vista-previa"
+          className="border-border rounded-lg border p-4"
+        >
           <h2 id="vista-previa" className="text-xl font-semibold">
             Vista previa
           </h2>
@@ -255,13 +314,52 @@ export function ImportLoanForm({ clientId, clientName, today }: Props) {
               {formatIsoDate(planned.plan.installments[0]!.dueOn)}
             </dd>
           </dl>
-          {planned.difference !== null && planned.difference !== 0 ? (
-            <div className="mt-3">
+          {unbalanced ? (
+            <div className="mt-3 flex flex-col gap-3">
               <Alert variant="warning" title="Los datos históricos no cuadran">
                 El total pactado menos lo pagado y el saldo pendiente da{" "}
-                {formatMoney(money(planned.difference))}. Puede haber abonos, descuentos o un error:
-                revisa antes de importar. Se guardará el saldo pendiente que escribiste.
+                {formatMoney(money(planned.difference ?? 0))}. Puede haber abonos, descuentos o un
+                error: revisa antes de importar. Si importas así, se guardará el saldo pendiente que
+                escribiste y la diferencia quedará en la auditoría con tu observación.
               </Alert>
+              <div className="flex flex-col gap-1">
+                <label className="flex min-h-11 items-center gap-2 text-base font-medium">
+                  <input
+                    type="checkbox"
+                    name="confirmMismatch"
+                    checked={mismatch.confirmed}
+                    disabled={busy}
+                    aria-invalid={confirmErrors.confirmMismatch ? true : undefined}
+                    aria-describedby={confirmErrors.confirmMismatch ? confirmErrorId : undefined}
+                    onChange={(event) => {
+                      setMismatch({ ...mismatch, confirmed: event.target.checked });
+                      onEditConfirmation();
+                    }}
+                    className="size-5"
+                  />
+                  Confirmo que quiero importar con esta diferencia
+                </label>
+                {confirmErrors.confirmMismatch ? (
+                  <p id={confirmErrorId} aria-live="polite" className="text-danger-strong text-sm">
+                    <span aria-hidden="true">⚠ </span>
+                    {confirmErrors.confirmMismatch}
+                  </p>
+                ) : null}
+              </div>
+              <TextAreaField
+                label="Observación del descuadre"
+                name="mismatchNote"
+                maxLength={500}
+                required
+                readOnly={busy}
+                value={mismatch.note}
+                onChange={(event) => {
+                  setMismatch({ ...mismatch, note: event.target.value });
+                  onEditConfirmation();
+                }}
+                hint="Explica la diferencia (abonos de interés, descuentos…). Queda en la auditoría."
+                error={confirmErrors.mismatchNote}
+              />
             </div>
           ) : null}
           {planned.overdueInstallments > 0 ? (
@@ -276,21 +374,61 @@ export function ImportLoanForm({ clientId, clientName, today }: Props) {
           ) : null}
 
           <h3 className="mt-4 text-lg font-medium">Cuotas que faltan</h3>
-          <ol className="mt-2 grid max-h-72 gap-1 overflow-y-auto text-sm sm:grid-cols-2">
-            {planned.plan.installments.map((installment) => (
-              <li
-                key={installment.number}
-                className="border-border flex justify-between gap-3 border-b py-1"
-              >
-                <span>
-                  {installment.number}. {formatIsoDate(installment.dueOn)}
-                </span>
-                <span className="font-mono tabular-nums">
-                  {formatMoney(money(installment.amount))}
-                </span>
+          <p className="text-muted text-sm">
+            Propuesta: el saldo en partes iguales. Puedes cambiar el monto de cada cuota; entre
+            todas tienen que dar el saldo pendiente, ni un peso más ni uno menos.
+          </p>
+          <ol className="mt-2 grid max-h-96 gap-3 overflow-y-auto p-1 sm:grid-cols-2">
+            {planned.plan.installments.map((installment, index) => (
+              <li key={installment.number}>
+                <TextField
+                  label={`Cuota ${installment.number}, ${formatIsoDate(installment.dueOn)}`}
+                  name={`installment-${installment.number}`}
+                  inputMode="numeric"
+                  autoComplete="off"
+                  required
+                  readOnly={busy}
+                  value={amounts[index] ?? ""}
+                  onChange={(event) => {
+                    const next = [...amounts];
+                    next[index] = event.target.value;
+                    setAmounts(next);
+                    onEditConfirmation();
+                  }}
+                  className="font-mono tabular-nums"
+                  error={confirmErrors[`amount-${index}`]}
+                />
               </li>
             ))}
           </ol>
+          {/* Sin `aria-live`: anunciaría cada tecla; los errores se anuncian al enfocar el campo. */}
+          <p className="mt-3 text-sm">
+            {amountsSum === null ? (
+              "Revisa los montos: alguno no es un número válido."
+            ) : amountsSum === planned.plan.scheduled ? (
+              <>
+                Las cuotas suman{" "}
+                <span className="font-mono tabular-nums">{formatMoney(money(amountsSum))}</span>,
+                igual al saldo pendiente.
+              </>
+            ) : (
+              <>
+                Las cuotas suman{" "}
+                <span className="font-mono tabular-nums">{formatMoney(money(amountsSum))}</span>:{" "}
+                {amountsSum < planned.plan.scheduled ? "faltan" : "sobran"}{" "}
+                <span className="font-mono tabular-nums">
+                  {formatMoney(money(Math.abs(planned.plan.scheduled - amountsSum)))}
+                </span>{" "}
+                para llegar al saldo pendiente.
+              </>
+            )}
+          </p>
+          {confirmErrors.amounts ? (
+            <p aria-live="polite" className="text-danger-strong mt-1 text-sm">
+              <span aria-hidden="true">⚠ </span>
+              {confirmErrors.amounts}
+            </p>
+          ) : null}
           <p className="text-muted mt-3 text-sm">
             Importar no crea pagos ni movimientos: la Caja Mayor no cambia.
           </p>

@@ -7,6 +7,7 @@ import {
   parseClientSearch,
 } from "@/modules/portfolio/client-queries";
 import { getPool } from "@/shared/database/pg-pool";
+import { Alert } from "@/shared/ui/alert";
 
 export const metadata: Metadata = { title: "Clientes" };
 
@@ -20,7 +21,10 @@ export default async function ClientsPage({
 }) {
   // Los layouts no se vuelven a ejecutar al navegar: cada página protegida comprueba también.
   const session = await getPageSession({ roles: ["ADMIN_NEGOCIO"] });
-  const search = parseClientSearch(await searchParams);
+  const params = await searchParams;
+  const search = parseClientSearch(params);
+  // Lo pone la ficha tras eliminar un cliente: la confirmación se ve donde termina el recorrido.
+  const deleted = params.eliminado === "1";
   const { clients, truncated } = await listClients(getPool(), session, search);
 
   return (
@@ -37,6 +41,11 @@ export default async function ClientsPage({
           Nuevo cliente
         </Link>
       </div>
+      {deleted ? (
+        <div className="mt-4">
+          <Alert variant="success">El cliente fue eliminado.</Alert>
+        </div>
+      ) : null}
 
       {/* GET: la búsqueda vive en la URL (se puede compartir y recargar) y no requiere JavaScript. */}
       <form

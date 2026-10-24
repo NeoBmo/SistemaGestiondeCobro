@@ -139,11 +139,21 @@ function Widget({ widget, data }: { widget: Widget; data: DashboardData }) {
           </p>
         </Card>
       );
+    case "LATE_FEES":
+      return (
+        <Card id={widget} title={title}>
+          <Figure value={data.lateFees.pending} testId="mora-pendiente" />
+          <p className="text-muted text-sm">
+            {data.lateFees.charges}{" "}
+            {data.lateFees.charges === 1 ? "cargo de mora activo" : "cargos de mora activos"}
+          </p>
+        </Card>
+      );
     case "COLLECTED":
       return (
         <Card id={widget} title={title}>
           <Figure value={data.collected} testId="cobrado" />
-          <p className="text-muted text-sm">Neto de reversos</p>
+          <p className="text-muted text-sm">Cuotas y cargos de mora, neto de reversos</p>
         </Card>
       );
     case "SPENT":

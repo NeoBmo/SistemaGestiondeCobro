@@ -13,5 +13,7 @@ export default defineConfig([
     "playwright-report/**",
     "test-results/**",
     "next-env.d.ts",
+    // Worktrees de agentes dentro del repo: su .next/ rompía el lint local.
+    ".worktrees/**",
   ]),
 ]);

@@ -6,6 +6,7 @@ export const WIDGETS = [
   "CASH_BALANCE",
   "PORTFOLIO_PENDING",
   "PORTFOLIO_OVERDUE",
+  "LATE_FEES",
   "COLLECTED",
   "SPENT",
   "SETTLEMENTS",
@@ -15,8 +16,10 @@ export type Widget = (typeof WIDGETS)[number];
 
 export const WIDGET_LABEL: Record<Widget, string> = {
   CASH_BALANCE: "Caja Mayor",
-  PORTFOLIO_PENDING: "Cartera pendiente",
-  PORTFOLIO_OVERDUE: "Cartera vencida",
+  // La cartera cuenta solo cuotas y se rotula así; la mora es un indicador aparte (02 §7).
+  PORTFOLIO_PENDING: "Cartera pendiente (cuotas)",
+  PORTFOLIO_OVERDUE: "Cartera vencida (cuotas)",
+  LATE_FEES: "Mora pendiente",
   COLLECTED: "Cobrado del periodo",
   SPENT: "Gastos del periodo",
   SETTLEMENTS: "Jornadas y diferencias",

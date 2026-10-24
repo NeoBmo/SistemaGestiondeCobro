@@ -11,7 +11,8 @@ import type { IdempotencyKey } from "@/shared/ids/idempotency-key";
  * Liquidación de la jornada (02 §5.5, ADR 0009). El cobrador declara lo que entrega (la jornada pasa a
  * `PENDIENTE_LIQUIDACION`); el Admin confirma con lo que realmente recibió: ese dinero entra a la Caja Mayor,
  * la diferencia (faltante o sobrante) se registra y exige observación, y la jornada queda en cero. Resolver
- * una diferencia es un `AJUSTE` nuevo de la Caja Mayor: la liquidación previa nunca cambia.
+ * una diferencia es un hecho nuevo, una sola vez y con motivo: o un `AJUSTE` de la Caja Mayor (reposición)
+ * o un cierre sin dinero (asumida por el negocio). La liquidación previa nunca cambia.
  */
 
 type Base = { idempotencyKey: IdempotencyKey };
@@ -263,8 +264,39 @@ export type ResolvedDifference = {
 };
 
 /**
- * El Admin resuelve una diferencia con un `AJUSTE` de la Caja Mayor por el importe de la diferencia (un
- * faltante repuesto entra; un sobrante devuelto sale). Una sola vez; la liquidación no cambia.
+ * Liquidación `CON_DIFERENCIA` aún sin resolver, bloqueada hasta confirmar, con su diferencia (positiva =
+ * faltante, negativa = sobrante). Una diferencia se resuelve una sola vez, de una de las dos formas.
+ */
+async function lockUnresolvedDifference(
+  tx: Tx,
+  businessId: string,
+  settlementId: string,
+): Promise<{ id: string; difference: number }> {
+  const found = await lockSettlement(tx, businessId, settlementId);
+  if (found.status !== "CON_DIFERENCIA") {
+    throw new AppError(
+      "SETTLEMENT_WITHOUT_DIFFERENCE",
+      "Solo se resuelve una liquidación con diferencia",
+      409,
+    );
+  }
+  const resolved = await tx.query(
+    "select 1 from public.settlement_resolutions where settlement_id = $1",
+    [found.id],
+  );
+  if ((resolved.rowCount ?? 0) > 0) {
+    throw new AppError("DIFFERENCE_ALREADY_RESOLVED", "Esta diferencia ya fue resuelta", 409);
+  }
+  const row = await tx.query<{ difference: string }>(
+    "select difference::text from public.settlements where id = $1",
+    [found.id],
+  );
+  return { id: found.id, difference: Number(row.rows[0]!.difference) };
+}
+
+/**
+ * Reposición: el Admin resuelve una diferencia con un `AJUSTE` de la Caja Mayor por el importe de la
+ * diferencia (un faltante repuesto entra; un sobrante devuelto sale). Una sola vez; la liquidación no cambia.
  */
 export function resolveDifference(
   deps: ContractDeps,
@@ -278,26 +310,8 @@ export function resolveDifference(
     idempotencyKey,
     input: content,
     execute: async (tx, context) => {
-      const found = await lockSettlement(tx, context.businessId, input.settlementId);
-      if (found.status !== "CON_DIFERENCIA") {
-        throw new AppError(
-          "SETTLEMENT_WITHOUT_DIFFERENCE",
-          "Solo se resuelve una liquidación con diferencia",
-          409,
-        );
-      }
-      const resolved = await tx.query(
-        "select 1 from public.settlement_resolutions where settlement_id = $1",
-        [found.id],
-      );
-      if ((resolved.rowCount ?? 0) > 0) {
-        throw new AppError("DIFFERENCE_ALREADY_RESOLVED", "Esta diferencia ya fue resuelta", 409);
-      }
-      const row = await tx.query<{ difference: string }>(
-        "select difference::text from public.settlements where id = $1",
-        [found.id],
-      );
-      const difference = Number(row.rows[0]!.difference);
+      const found = await lockUnresolvedDifference(tx, context.businessId, input.settlementId);
+      const difference = found.difference;
       const direction = difference > 0 ? "ENTRADA" : "SALIDA";
       const adjustment = await insertMovement(tx, context, {
         type: "AJUSTE",
@@ -307,8 +321,8 @@ export function resolveDifference(
         reference: { type: "settlement", id: found.id },
       });
       await tx.query(
-        `insert into public.settlement_resolutions (business_id, settlement_id, movement_id, note, resolved_by)
-         values ($1, $2, $3, $4, $5)`,
+        `insert into public.settlement_resolutions (business_id, settlement_id, kind, movement_id, note, resolved_by)
+         values ($1, $2, 'REPOSICION', $3, $4, $5)`,
         [context.businessId, found.id, adjustment.id, input.note, context.actorId],
       );
       return {
@@ -330,6 +344,52 @@ export function resolveDifference(
               note: input.note,
               movementId: adjustment.id,
             },
+          },
+        ],
+      };
+    },
+  });
+}
+
+export type AssumedDifference = {
+  settlementId: string;
+  /** Importe de la diferencia que el negocio asume (sin signo). */
+  amount: number;
+  kind: "FALTANTE" | "SOBRANTE";
+};
+
+/**
+ * Asumida por el negocio (02 §5.5): cierra la diferencia sin mover dinero, porque la pérdida o el sobrante
+ * ya están reflejados en lo realmente entregado. Exige motivo, es una sola vez y la liquidación no cambia.
+ */
+export function assumeDifference(
+  deps: ContractDeps,
+  actor: SessionContext,
+  input: Base & { settlementId: string; note: string },
+): Promise<CashCommandOutcome<AssumedDifference>> {
+  const { idempotencyKey, ...content } = input;
+  return runCashCommand<AssumedDifference>(deps, {
+    name: "AsumirDiferencia",
+    actor,
+    idempotencyKey,
+    input: content,
+    execute: async (tx, context) => {
+      const found = await lockUnresolvedDifference(tx, context.businessId, input.settlementId);
+      await tx.query(
+        `insert into public.settlement_resolutions (business_id, settlement_id, kind, movement_id, note, resolved_by)
+         values ($1, $2, 'ASUMIDA', null, $3, $4)`,
+        [context.businessId, found.id, input.note, context.actorId],
+      );
+      const amount = Math.abs(found.difference);
+      const kind = found.difference > 0 ? "FALTANTE" : "SOBRANTE";
+      return {
+        result: { settlementId: found.id, amount, kind },
+        audit: [
+          {
+            action: "DiferenciaAsumida",
+            entityType: "settlement",
+            entityId: found.id,
+            summary: { amount, kind, note: input.note },
           },
         ],
       };
