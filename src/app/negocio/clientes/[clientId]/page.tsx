@@ -9,9 +9,9 @@ import { getPool } from "@/shared/database/pg-pool";
 import { formatIsoDate } from "@/shared/dates/dates";
 import { formatMoney } from "@/shared/money/money";
 import { CashFeedbackProvider } from "../../_components/cash-feedback";
-import { ConfirmAction } from "../../_components/confirm-action";
 import { AssignClientForm } from "../../rutas/_components/route-forms";
 import { ClientForm } from "../_components/client-form";
+import { DeleteClientButton } from "../_components/delete-client-button";
 
 export const metadata: Metadata = { title: "Cliente" };
 
@@ -188,18 +188,7 @@ export default async function ClientPage({ params }: { params: Promise<{ clientI
           </p>
         ) : (
           <div className="mt-3">
-            <CashFeedbackProvider>
-              <ConfirmAction<{ clientId: string }>
-                url={`/api/negocio/clientes/${client.id}/eliminar`}
-                label="Eliminar cliente"
-                variant="danger"
-                warning={`Se eliminarán ${client.name} y todos sus datos de contacto. No se puede deshacer.`}
-                confirmLabel="Eliminar definitivamente"
-                loadingText="Eliminando…"
-                successMessage={() => `${client.name} fue eliminado.`}
-                redirectTo="/negocio/clientes?eliminado=1"
-              />
-            </CashFeedbackProvider>
+            <DeleteClientButton clientId={client.id} name={client.name} />
           </div>
         )}
       </section>
