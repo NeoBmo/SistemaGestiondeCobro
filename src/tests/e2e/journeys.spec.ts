@@ -153,11 +153,39 @@ test("el Super Admin filtra la lista y la contraseña temporal restablecida no s
   await expect(page.getByText("Ningún negocio coincide con los filtros.")).toBeVisible();
 
   await page.goto(`/super-admin/negocios/${businessId}`);
+  // Restablecer no lleva clave de idempotencia: un doble clic debe enviar una sola petición.
+  let resets = 0;
+  await page.route("**/admin-password", async (route) => {
+    resets += 1;
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    await route.continue();
+  });
   await page.getByRole("button", { name: "Restablecer contraseña" }).click();
-  await page.getByRole("button", { name: "Sí, restablecer contraseña" }).click();
+  await page.getByRole("button", { name: "Sí, restablecer contraseña" }).dblclick();
   await expect(page.getByTestId("temporary-password")).toBeVisible();
+  expect(resets).toBe(1);
+  await page.unroute("**/admin-password");
   await page.reload();
   await expect(page.getByTestId("temporary-password")).toHaveCount(0);
+});
+
+test("tras 5 contraseñas incorrectas el login pide esperar, aun con la contraseña correcta", async ({
+  page,
+}) => {
+  const businessId = await fixtures.business("Negocio bloqueo E2E");
+  const account = await fixtures.account({ role: "ADMIN_NEGOCIO", businessId });
+
+  for (let i = 0; i < 5; i += 1) {
+    await login(page, account.username, "Incorrecta123");
+    await expect(page.locator("main").getByRole("alert")).toContainText(
+      "Usuario o contraseña incorrectos",
+    );
+  }
+  await login(page, account.username, account.password);
+  await expect(page.locator("main").getByRole("alert")).toContainText(
+    "Demasiados intentos fallidos. Espera 15 minutos",
+  );
+  await expect(page).toHaveURL(/\/login$/);
 });
 
 test("el Admin lleva la Caja Mayor: apertura, ingreso, gasto, reverso y saldo derivado", async ({

@@ -22,6 +22,7 @@ afterAll(async () => {
 
 const deps = { db: pool, admin, syntheticEmailDomain: TEST_EMAIL_DOMAIN };
 const unique = () => `root.${crypto.randomUUID().slice(0, 8)}`;
+const who = { reason: "Alta de prueba del soporte de guardia", operator: "luis" };
 const authUserExists = async (username: string) =>
   ((
     await pool.query("select 1 from auth.users where email = $1", [
@@ -39,13 +40,15 @@ async function codeOf(promise: Promise<unknown>): Promise<string | undefined> {
 }
 
 describe("createSuperAdmin (scripts/create-super-admin.mjs)", () => {
-  it("crea un Super Admin ACTIVO sin negocio, con auditoría de arranque, que puede iniciar sesión", async () => {
+  it("crea un Super Admin ACTIVO sin negocio, auditado con motivo y usuario del SO, que puede iniciar sesión", async () => {
     const username = unique();
 
     const result = await createSuperAdmin(deps, {
       username: `  ${username.toUpperCase()} `,
       displayName: "  Plataforma Cuadre ",
       password: "ClaveSegura2026",
+      reason: "  Alta de prueba del soporte de guardia ",
+      operator: "luis",
     });
     fixtures.track({ userId: result.userId });
 
@@ -62,15 +65,24 @@ describe("createSuperAdmin (scripts/create-super-admin.mjs)", () => {
     });
 
     const audit = await pool.query(
-      "select action, actor_id, business_id, summary from public.audit_events where entity_id = $1",
+      `select action, actor_id, business_id, result, summary, occurred_at is not null as dated
+         from public.audit_events where entity_id = $1`,
       [result.userId],
     );
     expect(audit.rows).toEqual([
       {
-        action: "UsuarioCreado",
+        action: "SuperAdminCreado",
         actor_id: null,
         business_id: null,
-        summary: { role: "SUPER_ADMIN", username, origin: "bootstrap" },
+        result: "OK",
+        summary: {
+          role: "SUPER_ADMIN",
+          username,
+          origin: "script",
+          reason: "Alta de prueba del soporte de guardia",
+          operator: "luis",
+        },
+        dated: true,
       },
     ]);
     expect(JSON.stringify(audit.rows)).not.toContain("ClaveSegura2026");
@@ -88,8 +100,11 @@ describe("createSuperAdmin (scripts/create-super-admin.mjs)", () => {
 
   it("rechaza usuario, nombre o contraseña inválidos sin crear nada", async () => {
     const username = unique();
-    const good = { username, displayName: "Root", password: "ClaveSegura2026" };
+    const good = { username, displayName: "Root", password: "ClaveSegura2026", ...who };
     const cases: [Partial<typeof good>, string][] = [
+      [{ reason: "   " }, "INVALID_REASON"],
+      [{ reason: "x".repeat(501) }, "INVALID_REASON"],
+      [{ operator: "" }, "INVALID_OPERATOR"],
       [{ username: "No Válido" }, "INVALID_USERNAME"],
       [{ displayName: "   " }, "INVALID_DISPLAY_NAME"],
       [{ password: "corta1" }, "INVALID_PASSWORD"],
@@ -108,14 +123,52 @@ describe("createSuperAdmin (scripts/create-super-admin.mjs)", () => {
       username,
       displayName: "Root",
       password: "ClaveSegura2026",
+      ...who,
     });
     fixtures.track({ userId: first.userId });
 
     expect(
       await codeOf(
-        createSuperAdmin(deps, { username, displayName: "Otro", password: "ClaveSegura2026" }),
+        createSuperAdmin(deps, {
+          username,
+          displayName: "Otro",
+          password: "ClaveSegura2026",
+          ...who,
+        }),
       ),
     ).toBe("USERNAME_TAKEN");
+  });
+
+  it("si la auditoría falla, la transacción se revierte: ni perfil ni usuario de Auth", async () => {
+    const username = unique();
+    // Rompe solo la inserción del evento: el perfil ya insertado debe revertirse y Auth compensarse.
+    const failingAuditDb = {
+      query: pool.query.bind(pool),
+      connect: async () => {
+        const client = await pool.connect();
+        const query = client.query.bind(client) as (...args: unknown[]) => Promise<unknown>;
+        // Envoltorio, no mutación: la conexión vuelve intacta al pool compartido.
+        return {
+          query: (text: unknown, ...rest: unknown[]) =>
+            typeof text === "string" && text.includes("audit_events")
+              ? Promise.reject(new Error("auditoría caída"))
+              : query(text, ...rest),
+          release: client.release.bind(client),
+        };
+      },
+    } as unknown as typeof deps.db;
+
+    await expect(
+      createSuperAdmin(
+        { ...deps, db: failingAuditDb },
+        { username, displayName: "Root", password: "ClaveSegura2026", ...who },
+      ),
+    ).rejects.toThrow("auditoría caída");
+    expect(await authUserExists(username)).toBe(false);
+    const profile = await pool.query("select 1 from public.profiles where username = $1", [
+      username,
+    ]);
+    expect(profile.rowCount).toBe(0);
   });
 
   it("si la BD falla, elimina el usuario de Auth y no queda nada", async () => {
@@ -130,7 +183,7 @@ describe("createSuperAdmin (scripts/create-super-admin.mjs)", () => {
     await expect(
       createSuperAdmin(
         { ...deps, db: brokenDb },
-        { username, displayName: "Root", password: "ClaveSegura2026" },
+        { username, displayName: "Root", password: "ClaveSegura2026", ...who },
       ),
     ).rejects.toThrow("BD caída");
     expect(await authUserExists(username)).toBe(false);

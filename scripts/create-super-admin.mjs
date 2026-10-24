@@ -1,13 +1,18 @@
 // Crea un Super Admin (F1-T3). No hay pantalla ni endpoint para esto a propósito: el primer
 // Super Admin se crea desde una máquina de confianza con acceso a la base de datos.
 //
-//   npm run admin:create-super-admin
+//   npm run admin:create-super-admin -- --motivo "Alta del soporte de guardia (ticket 12)"
+//
+// El motivo es obligatorio (02-DOMINIO §1.4, decisión del 2026-10-24): queda en el evento de auditoría
+// SuperAdminCreado junto con el usuario del sistema operativo que ejecutó el script.
 //
 // Lee la configuración de .env.local (URL de Supabase, service role, DATABASE_URL y dominio del
 // email sintético), pide usuario, nombre y contraseña por consola y confirma el destino antes de
 // escribir. La contraseña la elige la persona: el Super Admin queda ACTIVO sin cambio pendiente.
+import os from "node:os";
 import { pathToFileURL } from "node:url";
 import readline from "node:readline";
+import { parseArgs } from "node:util";
 import { createClient } from "@supabase/supabase-js";
 import pg from "pg";
 
@@ -16,6 +21,7 @@ import pg from "pg";
 const USERNAME = /^[a-z0-9._-]{3,32}$/;
 const PASSWORD_MIN_LENGTH = 8;
 const PASSWORD_MAX_BYTES = 72;
+const REASON_MAX_LENGTH = 500;
 
 export function normalizeUsername(username) {
   return username.trim().toLowerCase();
@@ -45,11 +51,23 @@ function failure(code, message) {
 
 /**
  * Crea el usuario en Auth y, en una transacción, su perfil SUPER_ADMIN y el evento de auditoría
- * UsuarioCreado (sin actor: es el arranque de la plataforma). Si la BD falla, elimina el usuario de Auth.
+ * SuperAdminCreado (sin actor de la aplicación: lo ejecuta una persona en una máquina de confianza, cuyo
+ * usuario del sistema operativo y motivo quedan en el resumen). Si la BD falla, elimina el usuario de Auth.
  */
 export async function createSuperAdmin(deps, input) {
   const username = normalizeUsername(input.username);
   const displayName = input.displayName.trim();
+  const reason = (input.reason ?? "").trim();
+  const operator = (input.operator ?? "").trim();
+  if (reason.length === 0 || reason.length > REASON_MAX_LENGTH) {
+    throw failure(
+      "INVALID_REASON",
+      `El motivo es obligatorio (máximo ${REASON_MAX_LENGTH} caracteres): usa --motivo "…"`,
+    );
+  }
+  if (operator.length === 0) {
+    throw failure("INVALID_OPERATOR", "No se pudo identificar al usuario del sistema operativo");
+  }
   if (!isValidUsername(username)) {
     throw failure(
       "INVALID_USERNAME",
@@ -95,8 +113,11 @@ export async function createSuperAdmin(deps, input) {
     );
     await client.query(
       `insert into public.audit_events (business_id, actor_id, action, entity_type, entity_id, summary)
-       values (null, null, 'UsuarioCreado', 'profile', $1, $2::jsonb)`,
-      [userId, JSON.stringify({ role: "SUPER_ADMIN", username, origin: "bootstrap" })],
+       values (null, null, 'SuperAdminCreado', 'profile', $1, $2::jsonb)`,
+      [
+        userId,
+        JSON.stringify({ role: "SUPER_ADMIN", username, origin: "script", reason, operator }),
+      ],
     );
     await client.query("commit");
     return { userId, username };
@@ -196,7 +217,27 @@ function createPrompt() {
   };
 }
 
+/** Argumentos de la línea de comandos: `--motivo` es obligatorio y se valida antes de pedir nada. */
+export function parseCliArgs(argv) {
+  const { values } = parseArgs({
+    args: argv,
+    options: { motivo: { type: "string" } },
+    strict: true,
+  });
+  const reason = (values.motivo ?? "").trim();
+  if (reason.length === 0) {
+    throw failure(
+      "INVALID_REASON",
+      'Falta el motivo: npm run admin:create-super-admin -- --motivo "por qué se crea"',
+    );
+  }
+  return { reason };
+}
+
 async function main() {
+  const { reason } = parseCliArgs(process.argv.slice(2));
+  // Quién lo ejecutó, según el sistema operativo de la máquina de confianza (no lo escribe la persona).
+  const operator = os.userInfo().username;
   const url = requiredEnv("NEXT_PUBLIC_SUPABASE_URL");
   const serviceRoleKey = requiredEnv("SUPABASE_SERVICE_ROLE_KEY");
   const databaseUrl = requiredEnv("DATABASE_URL");
@@ -205,6 +246,7 @@ async function main() {
   const apiHost = new URL(url).host;
   const dbHost = new URL(databaseUrl).host;
   console.log(`Destino: ${apiHost} (base de datos: ${dbHost})`);
+  console.log(`Motivo: ${reason} — se registrará como ejecutado por "${operator}".`);
   // Un service role y una BD de proyectos distintos fallarían al insertar el perfil (FK a
   // auth.users) y se compensaría solo; aun así, avisar antes de escribir nada evita el susto.
   if (!dbHost.includes("127.0.0.1") && !dbHost.includes("localhost") && apiHost !== dbHost) {
@@ -234,7 +276,7 @@ async function main() {
     });
     const result = await createSuperAdmin(
       { db: pool, admin, syntheticEmailDomain },
-      { username, displayName, password },
+      { username, displayName, password, reason, operator },
     );
     console.log(`Listo: Super Admin "${result.username}" creado (id ${result.userId}).`);
   } finally {

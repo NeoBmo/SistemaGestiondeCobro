@@ -2,6 +2,7 @@ import { signInWithUsername } from "@/modules/identity/login";
 import { loginSchema } from "@/modules/identity/validation";
 import { getPool } from "@/shared/database/pg-pool";
 import { createSupabaseServerClient } from "@/shared/database/supabase-server";
+import { clientIp } from "@/shared/http/client-ip";
 import {
   assertSameOrigin,
   commandResponse,
@@ -21,7 +22,7 @@ export async function POST(request: Request): Promise<Response> {
         db: getPool(),
         syntheticEmailDomain: getServerEnv().syntheticEmailDomain,
       },
-      input,
+      { ...input, ip: clientIp(request) },
     );
     return commandResponse(result);
   } catch (error) {
