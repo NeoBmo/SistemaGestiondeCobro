@@ -20,7 +20,10 @@ describe("allocatePayment", () => {
         if (!result.ok) continue;
 
         expect(result.lines.reduce((sum, line) => sum + line.applied, 0)).toBe(amount);
-        expect(result.pending - result.loanPendingAfter).toBe(amount);
+        expect(result.pending).toBe(totalPending);
+        expect(result.loanPendingAfter).toBe(totalPending - amount);
+        // 02 §3.2: cada cuota se salda antes de pasar a la siguiente; solo la última puede quedar parcial.
+        for (const line of result.lines.slice(0, -1)) expect(line.pendingAfter).toBe(0);
         expect(result.lines.every((line) => line.applied > 0)).toBe(true);
         expect(
           result.lines.map((line) => line.installment.number),

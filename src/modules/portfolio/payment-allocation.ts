@@ -16,7 +16,6 @@ export function allocatePayment<T extends ExplainableInstallment>(
 ): PaymentAllocation<T> {
   const open = installments
     .filter((installment) => installment.pendingAmount > 0)
-    .slice()
     .sort((a, b) => a.number - b.number);
   const pending = open.reduce((sum, installment) => sum + installment.pendingAmount, 0);
   if (amount > pending) return { ok: false, reason: "EXCEEDS_BALANCE", pending };
