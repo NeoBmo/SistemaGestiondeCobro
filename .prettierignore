@@ -3,7 +3,8 @@ node_modules/
 coverage/
 playwright-report/
 test-results/
-.playwright-mcp/page-*.yml
+.playwright-mcp/
+.worktrees/
 package-lock.json
 npm-audit-report.json
 next-env.d.ts
