@@ -186,7 +186,8 @@ export function voidLateFee(
       const amount = money(charge.amount);
       // El cargo anulado tenía saldo (sin pagos vigentes), así que el préstamo no estaba pagado: si ahora
       // queda sin saldo, este es su cierre y se audita igual que el primero (02 §3.4).
-      const loanPaid = await isLoanPaid(tx, charge.loan_id);
+      // Solo un préstamo ACTIVO pasa a PAGADO (02 §2.3): uno anulado no se «cierra».
+      const loanPaid = loan.status === "ACTIVO" && (await isLoanPaid(tx, charge.loan_id));
       return {
         result: { chargeId: input.chargeId, loanId: charge.loan_id, amount, loanPaid },
         audit: [
