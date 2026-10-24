@@ -28,8 +28,12 @@ const contactFields = {
 
 export const createClientSchema = z.object({
   ...contactFields,
-  // Única por negocio y nunca cambia (ADR 0007): se recorta y no puede quedar vacía.
-  identification: requiredText("La identificación", 40),
+  // Única por negocio y nunca cambia (ADR 0007): se recorta y no puede quedar vacía. La unicidad compara
+  // solo sus letras y dígitos (02 §2.1), así que debe tener al menos uno.
+  identification: requiredText("La identificación", 40).refine(
+    (value) => /[\p{L}\p{Nd}]/u.test(value),
+    "La identificación debe tener al menos una letra o un dígito",
+  ),
 });
 
 export const updateClientSchema = z.object(contactFields);

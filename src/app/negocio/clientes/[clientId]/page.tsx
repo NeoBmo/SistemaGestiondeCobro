@@ -9,10 +9,18 @@ import { getPool } from "@/shared/database/pg-pool";
 import { formatIsoDate } from "@/shared/dates/dates";
 import { formatMoney } from "@/shared/money/money";
 import { CashFeedbackProvider } from "../../_components/cash-feedback";
+import { ConfirmAction } from "../../_components/confirm-action";
 import { AssignClientForm } from "../../rutas/_components/route-forms";
 import { ClientForm } from "../_components/client-form";
 
 export const metadata: Metadata = { title: "Cliente" };
+
+/** Por qué no se ofrece eliminar (02 §2.1: solo un cliente sin historial se elimina). */
+const DELETION_BLOCKED = {
+  HAS_CONTRACTS: "Este cliente tiene contratos o préstamos, así que no se puede eliminar.",
+  HAS_COLLECTION_HISTORY:
+    "Este cliente tiene historial de rutas o de intentos de cobro, así que no se puede eliminar.",
+} as const;
 
 const FREQUENCY_LABEL = {
   DIARIA: ["diaria", "diarias"],
@@ -25,7 +33,7 @@ export default async function ClientPage({ params }: { params: Promise<{ clientI
   const { clientId } = await params;
   const detail = await getClientDetail(getPool(), session, clientId);
   if (!detail) notFound();
-  const { client, loans } = detail;
+  const { client, loans, deletionBlocker } = detail;
   const db = getPool();
   const [assignment, routes, behavior] = await Promise.all([
     getClientAssignment(db, session, client.id),
@@ -168,6 +176,32 @@ export default async function ClientPage({ params }: { params: Promise<{ clientI
             notes: client.notes ?? "",
           }}
         />
+      </section>
+
+      <section aria-labelledby="eliminar" className="mt-8">
+        <h2 id="eliminar" className="text-xl font-semibold">
+          Eliminar cliente
+        </h2>
+        {deletionBlocker ? (
+          <p className="text-muted mt-2 text-sm" data-testid="eliminar-bloqueado">
+            {DELETION_BLOCKED[deletionBlocker]}
+          </p>
+        ) : (
+          <div className="mt-3">
+            <CashFeedbackProvider>
+              <ConfirmAction<{ clientId: string }>
+                url={`/api/negocio/clientes/${client.id}/eliminar`}
+                label="Eliminar cliente"
+                variant="danger"
+                warning={`Se eliminarán ${client.name} y todos sus datos de contacto. No se puede deshacer.`}
+                confirmLabel="Eliminar definitivamente"
+                loadingText="Eliminando…"
+                successMessage={() => `${client.name} fue eliminado.`}
+                redirectTo="/negocio/clientes?eliminado=1"
+              />
+            </CashFeedbackProvider>
+          </div>
+        )}
       </section>
     </>
   );

@@ -3,7 +3,11 @@ import { authorizeSession, type SessionContext } from "@/modules/identity/sessio
 import { isoDate, type IsoDate } from "@/shared/dates/dates";
 import { AppError } from "@/shared/errors/app-error";
 import { money, type Money } from "@/shared/money/money";
-import type { ClientRecord } from "./clients";
+import {
+  findClientDeletionBlocker,
+  type ClientDeletionBlocker,
+  type ClientRecord,
+} from "./clients";
 
 type Db = Pick<Pool, "query">;
 
@@ -23,8 +27,12 @@ export function parseClientSearch(
   params: Record<string, string | string[] | undefined>,
 ): string | undefined {
   const raw = Array.isArray(params.q) ? params.q[0] : params.q;
-  // El byte nulo no cabe en un `text` de Postgres: se descarta en vez de provocar un 500.
-  const value = raw?.replaceAll("\0", "").trim().slice(0, SEARCH_MAX_LENGTH);
+  // El byte nulo no cabe en un `text` de Postgres: se descarta en vez de provocar un 500. Los demás
+  // caracteres de control tampoco sirven: U+001F separa los campos de `clients.search_text`.
+  const value = raw
+    ?.replace(/\p{Cc}/gu, "")
+    .trim()
+    .slice(0, SEARCH_MAX_LENGTH);
   return value ? value : undefined;
 }
 
@@ -43,8 +51,10 @@ type ListRow = {
 };
 
 /**
- * Clientes del negocio de la sesión, por nombre. La búsqueda ignora mayúsculas y coincide con una parte
- * del nombre, el sobrenombre, la identificación o el teléfono (`position`, sin comodines `%`/`_`).
+ * Clientes del negocio de la sesión, por nombre. La búsqueda ignora tildes y mayúsculas (02 §2.1:
+ * `andres` encuentra `Andrés`) y coincide con una parte del nombre, el sobrenombre, la identificación o
+ * el teléfono: un `like` sobre la columna generada `search_text`, normalizada igual que el término, que
+ * usa su índice trigram. `\`, `%` y `_` se escapan para que el término nunca actúe como comodín.
  */
 export async function listClients(
   db: Db,
@@ -52,6 +62,7 @@ export async function listClients(
   search?: string,
 ): Promise<{ clients: ClientListItem[]; truncated: boolean }> {
   const businessId = businessOf(actor);
+  const pattern = search?.replace(/[\\%_]/g, "\\$&");
   const { rows } = await db.query<ListRow>(
     `select c.id, c.name, c.nickname, c.identification, c.phone,
             (select count(*) from public.loans l
@@ -60,13 +71,10 @@ export async function listClients(
        from public.clients c
       where c.business_id = $1
         and ($2::text is null
-             or position(lower($2::text) in lower(c.name)) > 0
-             or position(lower($2::text) in lower(coalesce(c.nickname, ''))) > 0
-             or position(lower($2::text) in lower(c.identification)) > 0
-             or position(lower($2::text) in lower(coalesce(c.phone, ''))) > 0)
+             or c.search_text like '%' || private.normalize_search($2::text) || '%')
       order by lower(c.name), c.id
       limit $3`,
-    [businessId, search ?? null, CLIENT_PAGE_SIZE + 1],
+    [businessId, pattern ?? null, CLIENT_PAGE_SIZE + 1],
   );
   return {
     truncated: rows.length > CLIENT_PAGE_SIZE,
@@ -103,12 +111,19 @@ type LoanRow = {
   disbursed_on: string;
 };
 
-/** Ficha del cliente con sus préstamos, o `null` si no existe en el negocio de la sesión. */
+/**
+ * Ficha del cliente con sus préstamos y, si no se puede eliminar, el porqué; o `null` si no existe en el
+ * negocio de la sesión.
+ */
 export async function getClientDetail(
   db: Db,
   actor: SessionContext,
   clientId: string,
-): Promise<{ client: ClientRecord; loans: ClientLoanSummary[] } | null> {
+): Promise<{
+  client: ClientRecord;
+  loans: ClientLoanSummary[];
+  deletionBlocker: ClientDeletionBlocker | null;
+} | null> {
   const businessId = businessOf(actor);
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(clientId))
     return null;
@@ -141,8 +156,10 @@ export async function getClientDetail(
       order by l.created_at desc, l.id`,
     [clientId, businessId],
   );
+  const deletionBlocker = await findClientDeletionBlocker(db, clientId);
 
   return {
+    deletionBlocker,
     client: {
       id: row.id,
       name: row.name,
