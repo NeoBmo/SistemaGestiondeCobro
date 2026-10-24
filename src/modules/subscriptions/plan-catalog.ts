@@ -1,4 +1,4 @@
-import { money, type Money } from "@/shared/money/money";
+import { money, subtractMoney, type Money } from "@/shared/money/money";
 import type { PlanCode } from "./plans";
 
 /**
@@ -61,7 +61,7 @@ export const PLAN_CATALOG: readonly PlanCatalogEntry[] = [
 
 /** Descuento entero frente al precio de referencia (1.200.000 → 960.000 = 20). */
 export function discountPercent(price: Money, reference: Money): number {
-  return Math.round(((reference - price) * 100) / reference);
+  return Math.round((subtractMoney(reference, price) * 100) / reference);
 }
 
 /** «Hasta 5 cobradores activos» o «Cobradores sin límite práctico». */
