@@ -185,20 +185,23 @@ export async function updateClient(
 /**
  * Por qué un cliente no se puede eliminar, o `null` si se puede. 02 §2.1 permite eliminar al que no tiene
  * ningún contrato ni préstamo (un préstamo siempre cuelga de un contrato). Su historial de rutas o de
- * intentos de cobro también lo impide: es historia operativa que no se borra, y sus claves foráneas lo
- * exigen de todos modos.
+ * intentos de cobro también lo impide, de forma provisional (pendiente en 05): 02 no lo dice, y sus
+ * claves foráneas lo exigen mientras no se decida borrarlo o anonimizarlo.
  */
 export type ClientDeletionBlocker = "HAS_CONTRACTS" | "HAS_COLLECTION_HISTORY";
 
 export async function findClientDeletionBlocker(
   db: Pick<Pool, "query"> | Tx,
+  businessId: string,
   clientId: string,
 ): Promise<ClientDeletionBlocker | null> {
   const { rows } = await db.query<{ contracts: boolean; collection: boolean }>(
-    `select exists (select 1 from public.contracts where client_id = $1) as contracts,
-            exists (select 1 from public.client_assignments where client_id = $1)
-              or exists (select 1 from public.collection_attempts where client_id = $1) as collection`,
-    [clientId],
+    `select exists (select 1 from public.contracts where client_id = $1 and business_id = $2)
+              as contracts,
+            exists (select 1 from public.client_assignments where client_id = $1 and business_id = $2)
+              or exists (select 1 from public.collection_attempts
+                          where client_id = $1 and business_id = $2) as collection`,
+    [clientId, businessId],
   );
   if (rows[0]!.contracts) return "HAS_CONTRACTS";
   if (rows[0]!.collection) return "HAS_COLLECTION_HISTORY";
@@ -233,7 +236,7 @@ export async function deleteClient(
       );
       if (found.rowCount === 0) throw new AppError("CLIENT_NOT_FOUND", "El cliente no existe", 404);
 
-      const blocker = await findClientDeletionBlocker(tx, clientId);
+      const blocker = await findClientDeletionBlocker(tx, businessId, clientId);
       if (blocker) throw new AppError("CLIENT_HAS_HISTORY", DELETION_BLOCKED[blocker], 409);
 
       await tx.query("delete from public.clients where id = $1 and business_id = $2", [

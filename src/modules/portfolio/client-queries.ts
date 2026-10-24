@@ -54,7 +54,8 @@ type ListRow = {
  * Clientes del negocio de la sesión, por nombre. La búsqueda ignora tildes y mayúsculas (02 §2.1:
  * `andres` encuentra `Andrés`) y coincide con una parte del nombre, el sobrenombre, la identificación o
  * el teléfono: un `like` sobre la columna generada `search_text`, normalizada igual que el término, que
- * usa su índice trigram. `\`, `%` y `_` se escapan para que el término nunca actúe como comodín.
+ * usa su índice trigram. `\`, `%` y `_` se escapan después de normalizar, para que el término nunca
+ * actúe como comodín.
  */
 export async function listClients(
   db: Db,
@@ -62,7 +63,6 @@ export async function listClients(
   search?: string,
 ): Promise<{ clients: ClientListItem[]; truncated: boolean }> {
   const businessId = businessOf(actor);
-  const pattern = search?.replace(/[\\%_]/g, "\\$&");
   const { rows } = await db.query<ListRow>(
     `select c.id, c.name, c.nickname, c.identification, c.phone,
             (select count(*) from public.loans l
@@ -71,10 +71,11 @@ export async function listClients(
        from public.clients c
       where c.business_id = $1
         and ($2::text is null
-             or c.search_text like '%' || private.normalize_search($2::text) || '%')
+             or c.search_text like '%' || replace(replace(replace(
+                  private.normalize_search($2::text), '\\', '\\\\'), '%', '\\%'), '_', '\\_') || '%')
       order by lower(c.name), c.id
       limit $3`,
-    [businessId, pattern ?? null, CLIENT_PAGE_SIZE + 1],
+    [businessId, search ?? null, CLIENT_PAGE_SIZE + 1],
   );
   return {
     truncated: rows.length > CLIENT_PAGE_SIZE,
@@ -156,7 +157,7 @@ export async function getClientDetail(
       order by l.created_at desc, l.id`,
     [clientId, businessId],
   );
-  const deletionBlocker = await findClientDeletionBlocker(db, clientId);
+  const deletionBlocker = await findClientDeletionBlocker(db, businessId, clientId);
 
   return {
     deletionBlocker,
