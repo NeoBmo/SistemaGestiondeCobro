@@ -206,16 +206,71 @@ test("el Admin importa un préstamo anterior: sin pagos ni cambios en la caja, c
   await expect(page.getByRole("heading", { name: "Vista previa" })).toBeVisible();
   await expect(page.getByText("cuota(s) ya vencida(s)")).toBeVisible();
   await expect(page.getByText("Los datos históricos no cuadran")).toHaveCount(0);
+
+  // Propuesta en partes iguales; el Admin cambia montos y la suma debe cuadrar con el saldo (02 §6.1).
+  await expect(page.getByLabel(/^Cuota 1,/)).toHaveValue("100000");
+  await page.getByLabel(/^Cuota 1,/).fill("150000");
+  await expect(page.getByText(/sobran \$50\.000/)).toBeVisible();
+  await page.getByRole("button", { name: "Importar préstamo" }).click();
+  await expect(page.getByText(/deben sumar exactamente el saldo pendiente/)).toBeVisible();
+  await expect(page).toHaveURL(/\/negocio\/prestamos\/importar/);
+  await page.getByLabel(/^Cuota 2,/).fill("50000");
+  await expect(page.getByText(/igual al saldo pendiente/)).toBeVisible();
   await page.getByRole("button", { name: "Importar préstamo" }).click();
 
   await expect(page.getByRole("heading", { level: 1, name: /Contrato CT-000001/ })).toBeVisible();
   await expect(page.getByText("Cartera importada")).toBeVisible();
   await expect(page.getByText("Pagado antes de importar")).toBeVisible();
   await expect(page.getByTestId("cuota")).toHaveCount(7);
+  await expect(page.getByTestId("cuota").first()).toContainText("$150.000");
+  await expect(page.getByTestId("cuota").nth(1)).toContainText("$50.000");
   await expect(page.getByText("Vencida").first()).toBeVisible();
 
   // Importar no mueve la Caja Mayor.
   await page.goto("/negocio/caja");
   await expect(page.getByTestId("saldo")).toHaveText("$0");
   await expect(page.getByText("Aún no hay movimientos.")).toBeVisible();
+});
+
+test("si los datos históricos no cuadran, importar exige confirmarlo con una observación que queda auditada", async ({
+  page,
+}) => {
+  const businessId = await fixtures.business("Negocio descuadre E2E");
+  const admin = await fixtures.account({ role: "ADMIN_NEGOCIO", businessId });
+  const client = await pool.query<{ id: string }>(
+    "insert into public.clients (business_id, name, identification, created_by) values ($1, 'Luz Antigua', $2, $3) returning id",
+    [businessId, randomUUID().slice(0, 8), admin.userId],
+  );
+  const day = (offset: number) =>
+    new Date(Date.now() - 5 * 3_600_000 + offset * 86_400_000).toISOString().slice(0, 10);
+
+  await login(page, admin.username, admin.password);
+  await page.goto(`/negocio/prestamos/importar?cliente=${client.rows[0]!.id}`);
+  await page.getByLabel("Fecha original del préstamo").fill(day(-30));
+  await page.getByLabel(/^Monto prestado originalmente/).fill("1000000");
+  // 1.200.000 total − 100.000 pagado − 700.000 pendiente = 400.000 que no cuadran.
+  await page.getByLabel(/^Ya pagado antes de importar/).fill("100000");
+  await page.getByLabel(/^Saldo pendiente hoy/).fill("700000");
+  await page.getByLabel(/^Cuotas que faltan/).fill("7");
+  await page.getByLabel("Próxima fecha de cobro").fill(day(1));
+  await page.getByRole("button", { name: "Calcular" }).click();
+
+  await expect(page.getByText("Los datos históricos no cuadran")).toBeVisible();
+  await page.getByRole("button", { name: "Importar préstamo" }).click();
+  await expect(page.getByText("Confirma que quieres importar con esta diferencia.")).toBeVisible();
+  await expect(page.getByText("Escribe por qué los datos históricos no cuadran.")).toBeVisible();
+
+  await page.getByLabel("Confirmo que quiero importar con esta diferencia").check();
+  await page.getByLabel(/^Observación del descuadre/).fill("Abonos de interés sin anotar");
+  await page.getByRole("button", { name: "Importar préstamo" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: /Contrato CT-000001/ })).toBeVisible();
+
+  const audit = await pool.query<{ summary: Record<string, unknown> }>(
+    "select summary from public.audit_events where business_id = $1 and action = 'PrestamoCreado'",
+    [businessId],
+  );
+  expect(audit.rows[0]!.summary).toMatchObject({
+    historicalDifference: 400_000,
+    mismatchNote: "Abonos de interés sin anotar",
+  });
 });

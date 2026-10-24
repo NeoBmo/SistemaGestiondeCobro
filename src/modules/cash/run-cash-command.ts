@@ -17,7 +17,8 @@ import type { IdempotencyKey } from "@/shared/ids/idempotency-key";
  *     la sesión, jamás de la petición (regla 1). Un cobrador que lo intenta deja un evento `RECHAZADO`.
  *  2. Abre **una** transacción (todo o nada, regla 7) con tope de espera de bloqueos.
  *  3. Toma el bloqueo consultivo de la caja (`pg_advisory_xact_lock`): los comandos de un mismo negocio
- *     se serializan y la comprobación del saldo no compite con otra escritura.
+ *     se serializan y la comprobación del saldo no compite con otra escritura. `runBusinessCommand` omite
+ *     solo este paso, para los comandos que no tocan ninguna caja.
  *  4. Idempotencia: reserva (negocio, comando, clave). Misma clave y mismo contenido → devuelve el
  *     resultado guardado sin volver a ejecutar; misma clave y contenido distinto → 409.
  *  5. Ejecuta el comando y exige al menos un evento de auditoría, que se registra en la misma transacción.
@@ -61,9 +62,56 @@ export type CashCommandOutcome<R> = {
 
 export type RunCashCommandDeps = { db: Pick<Pool, "connect"> };
 
-export async function runCashCommand<R>(
+export function runCashCommand<R>(
   deps: RunCashCommandDeps,
   command: CashCommand<R>,
+): Promise<CashCommandOutcome<R>> {
+  return runCommand<R, { cashboxId: string }>(deps, command, async (tx, businessId) => {
+    const box = await tx.query<{ id: string }>(
+      "select id from public.main_cashboxes where business_id = $1",
+      [businessId],
+    );
+    const cashboxId = box.rows[0]?.id;
+    if (!cashboxId) {
+      throw new AppError("CASHBOX_NOT_FOUND", "El negocio no tiene Caja Mayor", 500);
+    }
+    await tx.query("select pg_advisory_xact_lock(hashtextextended($1, 0))", [
+      `main-cashbox:${cashboxId}`,
+    ]);
+    return { cashboxId };
+  });
+}
+
+export type BusinessCommandContext = Omit<CashCommandContext, "cashboxId">;
+
+export type BusinessCommand<R> = Omit<CashCommand<R>, "execute"> & {
+  execute: (
+    tx: Tx,
+    context: BusinessCommandContext,
+  ) => Promise<{ result: R; audit: CashCommandAudit[] }>;
+};
+
+/**
+ * Igual que `runCashCommand` (autorización, transacción, idempotencia y auditoría) pero **sin el bloqueo
+ * de la Caja Mayor** (paso 3): solo para comandos que no leen ni escriben ninguna caja, como la
+ * importación de cartera. Un comando que mueve dinero o comprueba un saldo usa siempre `runCashCommand`.
+ */
+export function runBusinessCommand<R>(
+  deps: RunCashCommandDeps,
+  command: BusinessCommand<R>,
+): Promise<CashCommandOutcome<R>> {
+  return runCommand<R, object>(deps, command, async () => ({}));
+}
+
+async function runCommand<R, Extra extends object>(
+  deps: RunCashCommandDeps,
+  command: Omit<CashCommand<R>, "execute"> & {
+    execute: (
+      tx: Tx,
+      context: BusinessCommandContext & Extra,
+    ) => Promise<{ result: R; audit: CashCommandAudit[] }>;
+  },
+  prepare: (tx: Tx, businessId: string) => Promise<Extra>,
 ): Promise<CashCommandOutcome<R>> {
   const { actor } = command;
   const businessId =
@@ -74,18 +122,7 @@ export async function runCashCommand<R>(
   try {
     return await withTransaction(async (tx) => {
       await setLockTimeout(tx);
-
-      const box = await tx.query<{ id: string }>(
-        "select id from public.main_cashboxes where business_id = $1",
-        [businessId],
-      );
-      const cashboxId = box.rows[0]?.id;
-      if (!cashboxId) {
-        throw new AppError("CASHBOX_NOT_FOUND", "El negocio no tiene Caja Mayor", 500);
-      }
-      await tx.query("select pg_advisory_xact_lock(hashtextextended($1, 0))", [
-        `main-cashbox:${cashboxId}`,
-      ]);
+      const extra = await prepare(tx, businessId);
 
       // La clave de un cobrador es suya: otro cobrador del negocio con la misma clave no recibe su resultado.
       const hash = payloadHash(
@@ -116,9 +153,9 @@ export async function runCashCommand<R>(
       }
 
       const { result, audit } = await command.execute(tx, {
+        ...extra,
         businessId,
         actorId: actor.userId,
-        cashboxId,
         collectorId,
       });
       if (audit.length === 0) {
@@ -163,7 +200,7 @@ function translateInsufficientFunds(error: unknown): unknown {
 async function replay<R>(
   tx: Tx,
   businessId: string,
-  command: CashCommand<R>,
+  command: Pick<CashCommand<R>, "name" | "idempotencyKey">,
   hash: string,
 ): Promise<CashCommandOutcome<R>> {
   const existing = await tx.query<{ payload_hash: string; result: R | null }>(
@@ -180,8 +217,9 @@ async function replay<R>(
     );
   }
   if (stored.result === null) {
-    // Con el bloqueo de la caja tomado antes de reservar, una reserva sin resultado no puede
-    // pertenecer a una transacción viva; si ocurriera, es un estado inconsistente: no se adivina.
+    // La reserva y su resultado se guardan en la misma transacción, y otra reserva con la misma clave
+    // espera en el índice único a que esa transacción termine (con o sin bloqueo de caja): una reserva
+    // sin resultado no puede pertenecer a una transacción viva; si ocurriera, es un estado inconsistente.
     throw new AppError(
       "IDEMPOTENCY_STATE_INVALID",
       "No se pudo recuperar el resultado guardado",
