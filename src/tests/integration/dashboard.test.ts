@@ -22,6 +22,7 @@ import {
 } from "@/modules/dashboard/portfolio";
 import { getDashboard } from "@/modules/dashboard/queries";
 import { saveDashboardConfig } from "@/modules/dashboard/settings";
+import { WIDGETS } from "@/modules/dashboard/widgets";
 import { loadSessionContext, type SessionContext } from "@/modules/identity/session";
 import { createClient } from "@/modules/portfolio/clients";
 import { confirmContract } from "@/modules/portfolio/contracts";
@@ -232,7 +233,8 @@ describe("mora pendiente: indicador aparte de la cartera (decisión del 2026-10-
     // 12.000 del cargo parcial + 3.000 del activo sin pagos; el pagado y el anulado no cuentan.
     expect(data.lateFees).toEqual({ pending: 15_000, charges: 2 });
     // La cartera son solo cuotas: los cargos no la inflan.
-    expect(data.portfolio).toMatchObject({ pending: 400_000, overdue: 300_000 });
+    // Las cuatro cuotas ya vencieron (−4, −3, −2 y −1): toda la cartera está vencida.
+    expect(data.portfolio).toMatchObject({ pending: 400_000, overdue: 400_000 });
     expect(data.collected).toBe(8_000 + 5_000);
     // La cifra coincide con el detalle de cada préstamo.
     const detailBalances = await Promise.all(
@@ -342,7 +344,8 @@ describe("solo lectura, zona horaria y bordes", () => {
     const data = await getDashboard(pool, w.actor);
 
     expect(data.config).toMatchObject({ period: "7D", configurable: false });
-    expect(data.config.widgets).toHaveLength(7);
+    // La predeterminada son todos los indicadores, en su orden.
+    expect(data.config.widgets).toEqual([...WIDGETS]);
     const kept = await pool.query(
       "select period from public.dashboard_settings where business_id = $1",
       [w.businessId],
