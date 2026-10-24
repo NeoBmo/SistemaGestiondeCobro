@@ -10,6 +10,12 @@ import type { IdempotencyKey } from "@/shared/ids/idempotency-key";
 import { money } from "@/shared/money/money";
 import { calculateLoan, type LoanPlan } from "./loan-calculation";
 import type { ConfirmContractInput, LoanTermsInput } from "./loan-validation";
+import {
+  assertUsuryAcknowledged,
+  assessUsury,
+  usuryAuditSummary,
+  type UsuryAssessment,
+} from "./usury";
 
 /**
  * Contrato y préstamo nuevos (02 §2.2–2.4, ADR 0007). El flujo es de un solo paso: una vista previa que
@@ -33,6 +39,8 @@ export type LoanPreview = {
   /** Saldo actual de la Caja Mayor y si alcanza para desembolsar el principal. */
   cashBalance: number;
   sufficientFunds: boolean;
+  /** TEA del préstamo frente a la usura vigente (02 §2.3): advierte, no bloquea. */
+  usury: UsuryAssessment;
 };
 
 const toPlain = (plan: LoanPlan): LoanPreview["plan"] => ({
@@ -105,6 +113,7 @@ export async function previewLoan(
     disbursedOn,
     cashBalance,
     sufficientFunds: cashBalance >= plan.principal,
+    usury: await assessUsury(deps.db, plan, disbursedOn),
   };
 }
 
@@ -150,6 +159,9 @@ export function confirmContract(
         installmentCount: input.installmentCount,
         firstDueOn: input.firstDueOn,
       });
+      // Por encima de la usura vigente solo se confirma con la advertencia marcada (409 si no).
+      const usury = await assessUsury(tx, plan, disbursedOn);
+      assertUsuryAcknowledged(usury, input.acknowledgeUsuryWarning);
 
       // El número se pide dentro de esta transacción: si algo falla se revierte y no se consume.
       const number = (
@@ -230,7 +242,7 @@ export function confirmContract(
             action: "ContratoConfirmado",
             entityType: "contract",
             entityId: contractId,
-            summary: { number },
+            summary: { number, usury: usuryAuditSummary(usury) },
           },
           {
             action: "PrestamoCreado",
