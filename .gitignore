@@ -21,6 +21,9 @@ out/
 npm-debug.log*
 npm-audit-report.json
 
+# Bitácora local de sesiones de agentes (OpenCode/Codex): rutas y modelos de cada máquina
+MEMORY.md
+
 # Logs
 *.log
 

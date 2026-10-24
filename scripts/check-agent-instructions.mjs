@@ -12,6 +12,15 @@ if (!/^@AGENTS\.md\s*$/m.test(claude)) {
   throw new Error("CLAUDE.md debe importar AGENTS.md explícitamente.");
 }
 
+// Las 9 reglas no negociables deben estar en el contexto que todo agente carga siempre.
+const rules = agents.split("## Reglas de negocio no negociables")[1]?.split("\n## ")[0] ?? "";
+const ruleRows = rules.match(/^\| [1-9] \|/gm) ?? [];
+if (ruleRows.length !== 9) {
+  throw new Error(
+    `AGENTS.md debe listar las 9 reglas de negocio no negociables (encontradas: ${ruleRows.length}).`,
+  );
+}
+
 if (openCode.instructions) {
   throw new Error("OpenCode no debe cargar otro archivo de reglas que diverja de AGENTS.md.");
 }

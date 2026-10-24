@@ -13,6 +13,22 @@
 
 Los permisos no se heredan de esta prosa: cada cliente aplica su configuración de sandbox, permisos y aprobaciones. Los hooks y checks de CI solo garantizan las acciones que ejecutan explícitamente.
 
+## Reglas de negocio no negociables
+
+Índice para tenerlas siempre presentes; el texto que manda es `docs/planning/02-DOMINIO.md`.
+
+| # | Regla |
+| --- | --- |
+| 1 | Aislamiento estricto por `business_id`; ninguna consulta lo cruza |
+| 2 | Contrato, préstamo, cuota, pago, mora, gasto, movimiento, auditoría: entidades separadas, nunca fusionadas |
+| 3 | Ningún hecho financiero se edita/borra — corrección = `AJUSTE`/`REVERSO` nuevo con motivo |
+| 4 | Contrato `CONFIRMADO` es inmutable |
+| 5 | Pago parcial: faltante queda en su cuota; excedente a la siguiente cuota, cronológicamente |
+| 6 | Mora = cálculo derivado; nunca genera cobro automático |
+| 7 | Comando financiero = transacción única + auditoría + idempotencia, todo o nada |
+| 8 | Dinero como enteros: tipo `Money` en TS, `bigint` en BD; nunca `number` decimal/`float`. Interés en puntos básicos, redondeo half-up |
+| 9 | Escritura financiera solo vía Route Handler → servicio → transacción; nunca desde el navegador |
+
 ### Skills y agentes
 
 Una skill nunca introduce una regla que no esté en las fuentes de verdad anteriores. Si contradice una fuente normativa, se corrige la skill o agente. El detalle de uso y la política de esfuerzo según riesgo están en `docs/planning/06-AGENTES-HABILIDADES.md` §7 y ADR 0013; no se hace fallback ni escalamiento automático.
@@ -140,12 +156,14 @@ En CI no ocurre el fallo: el job `e2e` levanta Supabase local y además fija `E2
 
 ## Dependencias
 
-`CLAUDE.md` fija las versiones exactas y documenta dos topes deliberados que **no se deben subir**:
+`package.json` es la única fuente de las versiones: todas van exactas (sin `^` ni `~`). Runtime: Node.js 24 LTS (`.nvmrc`). No se duplican en tablas de documentación, que se desactualizan.
 
-- **TypeScript 7** rompe el lint (`typescript-eslint` exige `<6.1`).
-- **ESLint 10** rompe `eslint-config-next`.
+Dos topes deliberados que **no se deben subir**:
 
-Solo sube parches o minors de bajo riesgo, y siempre revisa la tabla de stack de `CLAUDE.md` en el mismo cambio.
+- **TypeScript 7** rompe el lint (`typescript-eslint` exige `<6.1`): se queda en 6.0.x.
+- **ESLint 10** rompe `eslint-config-next` (`eslint-plugin-react`): se queda en 9.x. Revisar al actualizar `eslint-config-next`.
+
+Solo sube parches o minors de bajo riesgo; instalar dependencias nuevas requiere aprobación humana.
 
 ## Convenciones
 
