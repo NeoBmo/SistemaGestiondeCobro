@@ -64,6 +64,8 @@ Aplicación
 - Almacenamiento de comprobantes de gastos, aprobación multinivel de gastos.
 - Chat en tiempo real, SLA o adjuntos en tickets de soporte.
 - Suspensión o cobro automático de suscripciones.
+- Resolución de diferencias de liquidación en parcialidades (decisión del 2026-10-24).
+- Selección de cuota al crear un cargo de mora desde la pantalla y vista de mora agregada por cliente (la API ya admite la cuota; decisión del 2026-10-24).
 
 No se construye ninguna de estas capacidades "como preparación". V1 puede asumir conectividad; el producto debe poder evolucionar hacia ellas sin implementarlas ahora.
 
