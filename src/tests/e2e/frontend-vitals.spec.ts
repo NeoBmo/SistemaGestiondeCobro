@@ -41,13 +41,16 @@ test("landing: adjunta cinco muestras locales de LCP, INP y CLS", async ({ brows
       await document.fonts.ready;
     });
 
-    const loginPagePromise = context.waitForEvent("page");
-    await page
-      .getByRole("link", { name: "Iniciar sesión" })
-      .first()
-      .click({ modifiers: ["Control"] });
-    const loginPage = await loginPagePromise;
-    await expect(loginPage).toHaveURL(/\/login$/);
+    // Interacción de puntero real que no abandona la landing, para que INP tenga muestra.
+    // Antes era Ctrl+clic en «Iniciar sesión»: en Chromium headless de CI la pestaña en
+    // segundo plano a veces no llegaba a adjuntarse (sin evento "page", o URL vacía) y la
+    // prueba fallaba por el navegador, no por la app. web-vitals reporta INP desde la
+    // primera entrada (first-input), así que cualquier clic sin navegación sirve.
+    await expect(page.getByRole("link", { name: "Iniciar sesión" }).first()).toHaveAttribute(
+      "href",
+      "/login",
+    );
+    await page.getByRole("heading", { level: 1 }).click();
     await expect.poll(() => reported.some((metric) => metric.name === "INP")).toBe(true);
 
     const hasLayoutShift = await page.evaluate(() =>
@@ -64,7 +67,6 @@ test("landing: adjunta cinco muestras locales de LCP, INP y CLS", async ({ brows
       expect(hasLayoutShift, `la muestra ${index + 1} tuvo shifts pero no reportó CLS`).toBe(false);
       reported.push({ name: "CLS", value: 0, id: "sin-layout-shift" });
     }
-    await loginPage.close();
     await page.close();
     await context.close();
     samples.push(reported);
@@ -90,7 +92,7 @@ test("landing: adjunta cinco muestras locales de LCP, INP y CLS", async ({ brows
       {
         environment: "Playwright Chromium; local production build; lab only",
         viewport: { width: 1280, height: 900 },
-        interaction: "Ctrl+click Iniciar sesión mantiene viva la landing para capturar LCP e INP",
+        interaction: "Clic en el titular de la landing (sin navegar) para capturar INP",
         sampleCount: 5,
         targets: {
           LCP: "<= 2500 ms",
